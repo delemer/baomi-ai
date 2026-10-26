@@ -155,7 +155,9 @@ export function tokenCapRetryFetch(
  * forbids top-level arrays), and the prompt must mention "JSON" (all of ours do).
  */
 export function jsonModeParams(baseUrl?: string): { response_format?: { type: "json_object" } } {
-  return /deepseek|openai\.com|moonshot|bigmodel\.cn|atlascloud|siliconflow|dashscope/i.test(baseUrl || "")
+  // max.xiafeng.co 实测支持 response_format=json_object（且要求 prompt 里出现 "JSON" 字样，
+  // 与官方 OpenAI 一致）；把它加入白名单能让脚本生成拿到供应商级 JSON 约束。
+  return /deepseek|openai\.com|moonshot|bigmodel\.cn|atlascloud|siliconflow|dashscope|max\.xiafeng\.co/i.test(baseUrl || "")
     ? { response_format: { type: "json_object" } }
     : {};
 }
@@ -188,13 +190,24 @@ export function optionalParamRetryFetch(
       return res;
     }
     const present = OPTIONAL_PARAMS.filter((p) => parsed[p] !== undefined);
-    if (present.length === 0) return res;
+    if (present.length === 0 && parsed.temperature === undefined) return res;
 
     const text = await res.text().catch(() => "");
     // Reading the body consumes it — any give-up path must hand back an equivalent Response.
     const asIs = () => new Response(text, { status: res.status, statusText: res.statusText, headers: res.headers });
     const blamed = present.filter((p) => text.includes(p));
-    if (blamed.length === 0) return asIs();
+    if (blamed.length === 0) {
+      // Some relays reject a supported-but-unavailable sampling parameter with an EMPTY 400
+      // body, so no field name exists for the loop below to blame. `temperature` is our
+      // default (0.8), not the user's intent — replay once without it rather than failing
+      // the whole script generation. Only on an empty body: a body that names something
+      // else must keep its original error.
+      if (text.trim() === "" && parsed.temperature !== undefined) {
+        delete parsed.temperature;
+        return baseFetch(url, { ...init, body: JSON.stringify(parsed) });
+      }
+      return asIs();
+    }
     for (const p of blamed) delete parsed[p];
     return baseFetch(url, { ...init, body: JSON.stringify(parsed) });
   };

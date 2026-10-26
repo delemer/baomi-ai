@@ -33,6 +33,7 @@ const PROVIDER_OPTIONS: { value: string; label: string }[] = [
   { value: "alibaba", label: "阿里百炼" },
   { value: "siliconflow", label: "硅基流动" },
   { value: "openai", label: "OpenAI / Compatible" },
+  { value: "max-relay", label: "Max API" },
 ];
 
 const labelOf = (opts: { value: string; label: string }[], v: string) =>

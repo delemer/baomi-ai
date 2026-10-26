@@ -11,6 +11,7 @@ import { ReplicateProvider } from './replicate'
 import { AlibabaProvider } from './alibaba'
 import { SiliconFlowProvider } from './siliconflow'
 import { OpenAIProvider } from './openai'
+import { MaxRelayProvider } from './max-relay'
 
 // ==================== Provider 注册表 ====================
 
@@ -73,6 +74,15 @@ registerProvider({
   displayName: 'OpenAI',
   description: 'OpenAI 与兼容服务，支持图片编辑及异步视频生成',
   factory: (config) => new OpenAIProvider(config),
+})
+
+// Max API（Supersolar 中转站）：chat/image 是 OpenAI 兼容，视频是自有的
+// JSON + metadata 契约，必须走独立 Provider（见 max-relay.ts 顶部说明）。
+registerProvider({
+  name: 'max-relay',
+  displayName: 'Max API',
+  description: 'Max API 中转站，支持 GPT Image / Nano Banana / Seedream 生图与 Seedance / Wan / Vidu 生视频',
+  factory: (config) => new MaxRelayProvider(config),
 })
 
 // ==================== 工厂函数 ====================
@@ -159,3 +169,4 @@ export { VolcEngineProvider } from './volcengine'
 export { AlibabaProvider } from './alibaba'
 export { SiliconFlowProvider } from './siliconflow'
 export { OpenAIProvider } from './openai'
+export { MaxRelayProvider } from './max-relay'

@@ -18,6 +18,7 @@ const DEFAULT_BASE: Record<string, string> = {
   alibaba: "https://dashscope.aliyuncs.com/api/v1",
   siliconflow: "https://api.siliconflow.cn/v1",
   openai: "https://api.openai.com/v1",
+  "max-relay": "https://max.xiafeng.co/v1",
 };
 
 type Probe = { url: string; headers: Record<string, string>; authFirst?: boolean; method?: "GET" | "POST"; body?: string };

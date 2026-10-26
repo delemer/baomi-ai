@@ -1,12 +1,20 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="cfg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="0.55" stop-color="#8b5cf6"/>
-      <stop offset="1" stop-color="#a78bfa"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="116" fill="url(#cfg)"/>
-  <path d="M204 160 L204 352 L360 256 Z" fill="#fff" stroke="#fff" stroke-width="36" stroke-linejoin="round" stroke-linecap="round"/>
-  <path d="M380 92 C384.5 130 395 140.5 433 145 C395 149.5 384.5 160 380 198 C375.5 160 365 149.5 327 145 C365 140.5 375.5 130 380 92 Z" fill="#fff"/>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="爆米AI">
+  <!-- 黑色圆角矩形 + 白色「米」：按 Noto Sans CJK SC 字形结构手工矢量（横竖主笔 + 上两点 + 下两捺），不依赖字体 -->
+  <rect width="512" height="512" rx="118" fill="#111111"/>
+  <g stroke="#FFFFFF" stroke-width="30" stroke-linecap="butt" fill="none">
+    <!-- 横（主笔，略偏上） -->
+    <path d="M98 250 H414"/>
+    <!-- 竖（主笔） -->
+    <path d="M256 70 V450"/>
+    <!-- 上左点 -->
+    <path d="M134 132 L186 216"/>
+    <!-- 上右点 -->
+    <path d="M378 132 L326 216"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="30" stroke-linecap="round" fill="none">
+    <!-- 左下撇 -->
+    <path d="M240 258 Q180 348 116 402"/>
+    <!-- 右下捺 -->
+    <path d="M272 258 Q332 348 396 402"/>
+  </g>
 </svg>

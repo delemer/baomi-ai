@@ -11,6 +11,7 @@ import {
   type VideoGenParams,
 } from "@/lib/gen-params";
 import { ATLAS_BASE_URL, ATLAS_LLM_BASE_URL, ATLAS_ONEKEY_MODELS, fillAtlasModelDefaults } from "@/lib/atlas-onekey";
+import { MAX_LLM_BASE_URL, MAX_MEDIA_BASE_URL, MAX_ONEKEY_MODELS, fillMaxModelDefaults } from "@/lib/max-onekey";
 import type { MotionIntensity, MotionRealismTier } from "@/lib/motion-prompt";
 import {
   isProductionProfileId,
@@ -113,6 +114,8 @@ export interface SettingsState {
   applyProductionProfile: (profile: ProductionProfileId) => void;
   /** 一个 Atlas Key 一键接入：脚本+看图+生图+生视频+配音全配好（不覆盖用户已选模型/已开的配音） */
   applyAtlasOneKey: (apiKey: string) => void;
+  /** 一个 Max API（中转站）Key 一键接入：脚本+看图+生图+生视频全配好（配音继续用免费 Edge TTS） */
+  applyMaxOneKey: (apiKey: string) => void;
 }
 
 /** Pollinations 的新端点（旧的 text.pollinations.ai 免 Key 接口已停用） */
@@ -180,6 +183,7 @@ export const useSettingsStore = create<SettingsState>()(
         alibaba: { enabled: false, apiKey: "" },
         siliconflow: { enabled: false, apiKey: "" },
         openai: { enabled: false, apiKey: "" },
+        "max-relay": { enabled: false, apiKey: "" },
       },
       llm: {
         provider: "",
@@ -271,6 +275,32 @@ export const useSettingsStore = create<SettingsState>()(
             tts: state.tts.enabled
               ? state.tts
               : { ...state.tts, enabled: true, provider: "atlas", baseUrl: ATLAS_BASE_URL, model: "", voice: "" },
+          };
+        }),
+      // 一个 Max API（中转站）Key 一键接入：脚本 + 看图 + 生图 + 生视频。
+      // 配音不动 —— 默认走内置免费 Edge TTS（中转站实测没有 /audio/speech）。
+      // 与 Atlas 版同样的克制：只填空值，不覆盖用户已有的模型选择。
+      applyMaxOneKey: (apiKey) =>
+        set((state) => {
+          const key = apiKey.trim();
+          const def = fillMaxModelDefaults({
+            image: state.defaultImageModel,
+            video: state.defaultVideoModel,
+          });
+          return {
+            llm: {
+              provider: "Max API",
+              baseUrl: MAX_LLM_BASE_URL,
+              apiKey: key,
+              model: MAX_ONEKEY_MODELS.llm,
+              visionModel: MAX_ONEKEY_MODELS.vision,
+            },
+            providers: {
+              ...state.providers,
+              "max-relay": { enabled: true, apiKey: key, baseUrl: MAX_MEDIA_BASE_URL },
+            },
+            defaultImageModel: def.image,
+            defaultVideoModel: def.video,
           };
         }),
     }),

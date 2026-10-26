@@ -42,7 +42,7 @@ describe("professional timeline export", () => {
     expect(csv).toContain("interview.mov");
     expect(csv).toContain('"重点,包含逗号"');
     expect(csv).toContain("00:00:03:13 重点");
-    expect(edl).toContain("* CLIPFORGE RHYTHM MARKERS");
+    expect(edl).toContain("* BAOMI AI RHYTHM MARKERS");
     expect(edl).toContain("* BEAT 00:00:03:13 · 重点");
     expect(edl).toContain("* CAPTION 00:00:00:00-00:00:01:06 · 开场介绍");
     expect(csv).toContain("Caption Cues");

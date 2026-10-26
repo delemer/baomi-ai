@@ -1,5 +1,5 @@
 {
-  "name": "clipforge",
+  "name": "baomi-ai",
   "version": "0.9.12",
   "private": true,
   "license": "AGPL-3.0-only",
@@ -61,8 +61,8 @@
     ]
   },
   "build": {
-    "appId": "com.clipforge.app",
-    "productName": "ClipForge",
+    "appId": "com.baomi.ai",
+    "productName": "爆米AI",
     "npmRebuild": false,
     "compression": "maximum",
     "directories": {
@@ -77,6 +77,11 @@
       "node_modules/@ffprobe-installer/**"
     ],
     "afterPack": "./electron/after-pack.cjs",
+    "extraResources": [
+      { "from": "LICENSE", "to": "LICENSE" },
+      { "from": "NOTICE", "to": "NOTICE" },
+      { "from": "THIRD-PARTY-NOTICES.md", "to": "THIRD-PARTY-NOTICES.md" }
+    ],
     "asarUnpack": [
       "node_modules/ffmpeg-static/**",
       "node_modules/@ffprobe-installer/**"

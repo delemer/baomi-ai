@@ -8,7 +8,7 @@ export const showcase: NamespaceMessages = {
     navBadge: "示例",
     makeSimilar: "做一个同款",
     // 说明区
-    introLead: "这是一个用「ClipForge」完整生成的示例：",
+    introLead: "这是一个用「爆米AI」完整生成的示例：",
     introMeta: "{style} · {shots} 个镜头 · {duration}s · {resolution} {aspectRatio}。",
     introTail: "下方是成片预览和分镜脚本，你可以照着做一个自己的。",
     // 分镜脚本
@@ -32,7 +32,7 @@ export const showcase: NamespaceMessages = {
     navTitle: "Example works",
     navBadge: "Demo",
     makeSimilar: "Make one like this",
-    introLead: "A complete example built with ClipForge: ",
+    introLead: "A complete example built with 爆米AI: ",
     introMeta: "{style} · {shots} shots · {duration}s · {resolution} {aspectRatio}.",
     introTail: " Below are the final preview and shot-by-shot script — follow along to make your own.",
     scriptTitle: "Shot script",

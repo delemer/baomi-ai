@@ -47,7 +47,7 @@ export interface TimelineExportResult {
 
 function safeStem(value: string, stripExtension = false): string {
   const base = basename(value);
-  return ((stripExtension ? base.replace(/\.[^.]+$/, "") : base).replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "clipforge-edit");
+  return ((stripExtension ? base.replace(/\.[^.]+$/, "") : base).replace(/[^\p{L}\p{N}._-]+/gu, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "baomi-edit");
 }
 
 function safeSourceName(value: string): string {
@@ -216,7 +216,7 @@ export function buildOtioTimeline(input: TimelineExportInput): string {
         captionCues: captionCues.map((cue) => ({ ...cue })),
       },
     },
-    name: input.projectName || "ClipForge edit",
+    name: input.projectName || "爆米AI edit",
     markers: beatMarkers.map((marker) => otioMarker(marker, rate)),
     tracks: {
       OTIO_SCHEMA: "Stack.1",
@@ -257,7 +257,7 @@ export function buildCmx3600Edl(input: TimelineExportInput): string {
   const ranges = normalizeTimeRanges(input.keepRanges, input.sourceDuration);
   const captionCues = normalizedCaptionCues(input, outputDuration(ranges));
   let recordCursor = 0;
-  const lines = [`TITLE: ${input.projectName || "CLIPFORGE EDIT"}`, "FCM: NON-DROP FRAME", ""];
+  const lines = [`TITLE: ${input.projectName || "BAOMI AI EDIT"}`, "FCM: NON-DROP FRAME", ""];
   ranges.forEach((range, index) => {
     const length = range.end - range.start;
     const event = String(index + 1).padStart(3, "0");
@@ -267,12 +267,12 @@ export function buildCmx3600Edl(input: TimelineExportInput): string {
     if (input.clipNotes?.[index]) lines.push(`* TRANSCRIPT: ${input.clipNotes[index].replace(/[\r\n]+/g, " ")}`);
     const captions = captionCues.filter((cue) => cue.time >= recordCursor - 0.001 && cue.time <= recordCursor + length + 0.001);
     for (const cue of captions) lines.push(`* CAPTION ${secondsToTimecode(cue.time, rate)}-${secondsToTimecode(cue.endTime, rate)} · ${cue.text}`);
-    lines.push(`* CLIPFORGE SOURCE: ${range.start.toFixed(3)} - ${range.end.toFixed(3)} seconds`, "");
+    lines.push(`* BAOMI AI SOURCE: ${range.start.toFixed(3)} - ${range.end.toFixed(3)} seconds`, "");
     recordCursor += length;
   });
   const beatMarkers = normalizedBeatMarkers(input, recordCursor);
   if (beatMarkers.length) {
-    lines.push("* CLIPFORGE RHYTHM MARKERS");
+    lines.push("* BAOMI AI RHYTHM MARKERS");
     for (const marker of beatMarkers) {
       lines.push(`* BEAT ${secondsToTimecode(marker.time, rate)}${marker.label ? ` · ${marker.label}` : ""}`);
     }

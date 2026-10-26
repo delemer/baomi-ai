@@ -10,11 +10,11 @@ export const settings: NamespaceMessages = {
 
     // 新手一键接入 Atlas
     oneKeyTitle: "新手推荐 · 一个 Key 全搞定",
-    oneKeyDesc: "填 Atlas Cloud 的 API Key，自动配好脚本 + 图 + 视频 + 配音，无需在下面逐项设置。",
-    oneKeyPlaceholder: "粘贴 Atlas Cloud API Key",
+    oneKeyDesc: "填 Max API 中转站的 API Key，自动配好脚本 + 看图 + 生图 + 生视频（配音用内置免费音色，无需额外配置）。",
+    oneKeyPlaceholder: "粘贴 Max API Key（sk- 开头）",
     oneKeyCta: "一键接入",
-    oneKeyDone: "已接入 Atlas Cloud — 下方 LLM / 生图 / 生视频 / 配音 已自动配好，可直接开始出片",
-    oneKeyGetKey: "没有 Key？前往 Atlas Cloud 获取 →",
+    oneKeyDone: "已接入 Max API — 下方脚本 / 生图 / 生视频 已自动配好，配音走内置免费音色，可直接开始出片",
+    oneKeyGetKey: "没有 Key？前往中转站注册并领取 →",
 
     // 标签页
     tabProviders: "平台 Key",
@@ -24,7 +24,7 @@ export const settings: NamespaceMessages = {
 
     // AI 平台描述/提示
     providerAtlasDesc: "高质量图像和视频生成平台，支持多种 AI 模型",
-    providerAtlasTip: "推荐首选，模型最全最便宜",
+    providerAtlasTip: "第三方平台：模型多，需自备 Key",
     providerFalDesc: "快速推理平台，支持 Flux、SDXL 等主流图像生成模型",
     providerFalTip: "支持 Kling 3.0、Veo 3 等最新模型",
     providerReplicateDesc: "海量模型聚合平台，FLUX、Imagen、Kling、Seedance、Veo 等一站接入",
@@ -40,6 +40,8 @@ export const settings: NamespaceMessages = {
     providerSiliconflowTip: "国产高性价比推理平台",
     providerOpenaiDesc: "OpenAI 与兼容服务，支持图片编辑及 Sora 视频任务",
     providerOpenaiTip: "视频默认使用 /videos；兼容服务可将 Base URL 填为完整的 /v1/video/generations 地址。自建模型请在自定义模型中添加。",
+    providerMaxrelayDesc: "中转站聚合：GPT Image / Nano Banana / Seedream 生图，Seedance / Wan / Vidu 生视频",
+    providerMaxrelayTip: "填你的中转站 Key 即可；图片按张计费、视频按秒计费，用完额度到中转站后台充值",
 
     // AI 平台卡片
     providerEnabled: "已启用",
@@ -48,7 +50,7 @@ export const settings: NamespaceMessages = {
     // LLM 配置
     llmProvider: "LLM Provider",
     llmPresetHint: "快捷预设（点击自动填入 baseUrl 和模型，还需填写 API Key）：",
-    presetAtlasTip: "推荐！LLM+生图生视频共用一个 Key",
+    presetAtlasTip: "Atlas 官方：LLM+生图生视频共用一个 Key",
     presetOpenrouterTip: "一个 Key 聚合 400+ 模型，OpenAI 协议直连",
     presetDeepseekTip: "V4 Flash 推理+对话统一模型",
     presetKimiTip: "K2.5 支持 Agent Swarm",
@@ -57,6 +59,7 @@ export const settings: NamespaceMessages = {
     presetDoubaoTip: "Seed 2.0 对标 GPT-5.2",
     presetOllamaTip: "本地离线·免费，需先 ollama pull qwen2.5",
     presetPollinationsTip: "注册领每日免费额度，需填 Key",
+    presetMaxrelayTip: "本站中转站·支持图片与视频",
     llmBaseUrlLabel: "API 地址（baseUrl）",
     providerBaseUrlLabel: "自定义接入点 baseUrl（选填）",
     providerBaseUrlPlaceholder: "留空走平台默认；可填代理/自建端点",
@@ -207,11 +210,11 @@ export const settings: NamespaceMessages = {
 
     // One-key Atlas setup for newcomers
     oneKeyTitle: "Recommended · One key does it all",
-    oneKeyDesc: "Paste your Atlas Cloud API key and we'll wire up scripts + images + video + voiceover automatically — no need to configure each section below.",
-    oneKeyPlaceholder: "Paste your Atlas Cloud API key",
+    oneKeyDesc: "Paste your Max API relay key and we'll wire up scripts + image + video automatically. Voiceover uses the built-in free voices.",
+    oneKeyPlaceholder: "Paste your Max API key (starts with sk-)",
     oneKeyCta: "Connect",
-    oneKeyDone: "Atlas Cloud connected — LLM / image / video / voiceover below are all set up. You're ready to create.",
-    oneKeyGetKey: "No key? Get one from Atlas Cloud →",
+    oneKeyDone: "Max API connected — scripts / image / video below are all set up, voiceover uses built-in free voices. You're ready to create.",
+    oneKeyGetKey: "No key? Sign up on the relay and get one →",
 
     // Tabs
     tabProviders: "Platform keys",
@@ -221,7 +224,7 @@ export const settings: NamespaceMessages = {
 
     // AI platform descriptions/tips
     providerAtlasDesc: "High-quality image and video generation platform supporting many AI models",
-    providerAtlasTip: "Top pick — widest model lineup at the lowest price",
+    providerAtlasTip: "Third-party platform: wide model lineup, bring your own key",
     providerFalDesc: "Fast inference platform supporting Flux, SDXL and other leading image models",
     providerFalTip: "Supports the latest models like Kling 3.0 and Veo 3",
     providerReplicateDesc: "Massive model aggregator — FLUX, Imagen, Kling, Seedance, Veo and more in one place",
@@ -237,6 +240,8 @@ export const settings: NamespaceMessages = {
     providerSiliconflowTip: "Cost-effective domestic inference platform",
     providerOpenaiDesc: "OpenAI and compatible servers — image editing and Sora video tasks",
     providerOpenaiTip: "Video uses /videos by default. For legacy servers, set Base URL to the full /v1/video/generations endpoint. Add self-hosted models under Custom models.",
+    providerMaxrelayDesc: "Relay aggregator: GPT Image / Nano Banana / Seedream for images, Seedance / Wan / Vidu for video",
+    providerMaxrelayTip: "Paste your relay key. Images are billed per image and videos per second — top up on the relay's own dashboard.",
 
     // AI platform card
     providerEnabled: "Enabled",
@@ -245,7 +250,7 @@ export const settings: NamespaceMessages = {
     // LLM config
     llmProvider: "LLM provider",
     llmPresetHint: "Quick presets (click to auto-fill baseUrl and model — you still need an API key):",
-    presetAtlasTip: "Recommended! One key for LLM, image and video generation",
+    presetAtlasTip: "Atlas official: one key for LLM, image and video",
     presetOpenrouterTip: "One key for 400+ models, direct OpenAI-compatible access",
     presetDeepseekTip: "V4 Flash unified reasoning + chat model",
     presetKimiTip: "K2.5 with Agent Swarm support",
@@ -254,6 +259,7 @@ export const settings: NamespaceMessages = {
     presetDoubaoTip: "Seed 2.0, on par with GPT-5.2",
     presetOllamaTip: "Local & offline, free — run `ollama pull qwen2.5` first",
     presetPollinationsTip: "Free daily credit after signup — key required",
+    presetMaxrelayTip: "Our relay — images and video supported",
     llmBaseUrlLabel: "API base URL (baseUrl)",
     providerBaseUrlLabel: "Custom endpoint baseUrl (optional)",
     providerBaseUrlPlaceholder: "Leave empty for platform default; or set a proxy/self-hosted endpoint",

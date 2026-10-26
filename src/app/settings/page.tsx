@@ -17,6 +17,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { LuUpload, LuPalette, LuZap, LuCheck, LuTriangleAlert } from "react-icons/lu";
 import { ATLAS_KEYS_URL } from "@/lib/atlas-onekey";
+import { MAX_KEYS_URL } from "@/lib/max-onekey";
 import { useT } from "@/lib/i18n";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useBrandStore } from "@/lib/stores/brand-store";
@@ -160,6 +161,21 @@ const AI_PROVIDERS = [
     ),
     iconBg: "from-teal-600 to-green-700",
   },
+  {
+    // 中转站：OpenAI 兼容的 chat/image + 自有的 JSON/metadata 视频契约
+    key: "max-relay",
+    name: "Max API",
+    descKey: "providerMaxrelayDesc",
+    tipKey: "providerMaxrelayTip",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2 4 7v10l8 5 8-5V7z" />
+        <path d="M12 22V12" />
+        <path d="m4 7 8 5 8-5" />
+      </svg>
+    ),
+    iconBg: "from-indigo-500 to-blue-600",
+  },
 ];
 
 // Map Chinese vendor names by key to i18n display names (English users would otherwise see hard-coded Chinese like "火山引擎/阿里百炼/硅基流动").
@@ -267,16 +283,16 @@ export default function SettingsPage() {
     setDefaultAspectRatio,
     setDefaultImageModel,
     setDefaultVideoModel,
-    applyAtlasOneKey,
+    applyMaxOneKey,
   } = useSettingsStore();
 
-  // one-click Atlas onboarding: a single Key auto-configures LLM/image-gen/video-gen/TTS
-  const [atlasOneKey, setAtlasOneKey] = useState("");
-  const [atlasApplied, setAtlasApplied] = useState(false);
+  // 一键接入：粘一个中转站 Key，脚本 + 看图 + 生图 + 生视频 全配好
+  const [relayOneKey, setRelayOneKey] = useState("");
+  const [relayApplied, setRelayApplied] = useState(false);
   const applyOneKey = () => {
-    if (!atlasOneKey.trim()) return;
-    applyAtlasOneKey(atlasOneKey.trim());
-    setAtlasApplied(true);
+    if (!relayOneKey.trim()) return;
+    applyMaxOneKey(relayOneKey.trim());
+    setRelayApplied(true);
   };
 
   // TTS preview playback state
@@ -446,7 +462,7 @@ export default function SettingsPage() {
             <h2 className="font-semibold text-sm">{t("oneKeyTitle")}</h2>
           </div>
           <p className="text-xs text-muted-foreground mb-3">{t("oneKeyDesc")}</p>
-          {atlasApplied ? (
+          {relayApplied ? (
             <div className="flex items-center gap-2 text-sm text-emerald-400">
               <LuCheck className="w-4 h-4 shrink-0" />
               <span>{t("oneKeyDone")}</span>
@@ -455,18 +471,18 @@ export default function SettingsPage() {
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
                 type="password"
-                value={atlasOneKey}
-                onChange={(e) => setAtlasOneKey(e.target.value)}
+                value={relayOneKey}
+                onChange={(e) => setRelayOneKey(e.target.value)}
                 placeholder={t("oneKeyPlaceholder")}
                 className="flex-1"
               />
-              <Button onClick={applyOneKey} disabled={!atlasOneKey.trim()} className="brand-gradient text-white border-0 shrink-0">
+              <Button onClick={applyOneKey} disabled={!relayOneKey.trim()} className="brand-gradient text-white border-0 shrink-0">
                 <LuZap className="w-4 h-4 mr-1.5" />
                 {t("oneKeyCta")}
               </Button>
             </div>
           )}
-          <a href={ATLAS_KEYS_URL} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-primary hover:underline">
+          <a href={MAX_KEYS_URL} target="_blank" rel="noreferrer" className="inline-block mt-2 text-xs text-primary hover:underline">
             {t("oneKeyGetKey")}
           </a>
         </div>

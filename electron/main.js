@@ -18,6 +18,11 @@ let logFilePath = "";
 let serverUrl = "";
 const { createSettingsStorage } = require("./settings-storage.cjs");
 
+// 品牌名为「爆米AI」，但 userData 目录固定用 ASCII（BaoMiAI）：
+// 数据目录会被拼进 ffmpeg/ffprobe 参数并交给第三方工具，路径里带中文在部分环境下会出
+// 编码问题；同时这也保证与官方 ClipForge 目录完全隔离，两个版本互不踩数据。
+app.setPath("userData", path.join(app.getPath("appData"), "BaoMiAI"));
+
 // Multiple desktop instances must not race migrations or overwrite the same settings files.
 const hasInstanceLock = app.requestSingleInstanceLock();
 if (!hasInstanceLock) app.quit();
@@ -35,7 +40,7 @@ function initLog() {
     const logDir = path.join(app.getPath("userData"), "logs");
     fs.mkdirSync(logDir, { recursive: true });
     logFilePath = path.join(logDir, "server.log");
-    fs.writeFileSync(logFilePath, `=== ClipForge 启动 ${new Date().toISOString()} (${process.platform}/${process.arch}) ===\n`);
+    fs.writeFileSync(logFilePath, `=== 爆米AI 启动 ${new Date().toISOString()} (${process.platform}/${process.arch}) ===\n`);
   } catch {
     logFilePath = "";
   }
@@ -215,7 +220,7 @@ if (hasInstanceLock) app.whenReady().then(async () => {
     // window simply never appears and the user reports "clicked, nothing happened" with no way to diagnose.
     if (!process.env.HEADLESS_SMOKE) {
       dialog.showErrorBox(
-        "ClipForge 启动失败 / Failed to start",
+        "爆米AI 启动失败 / Failed to start",
         `本地服务未能启动 / The local service failed to start.\n\n${(e && e.message) || e}\n\n` +
           `日志 / Log: ${logFilePath || "(不可用)"}\n\n--- 日志末尾 / log tail ---\n${readLogTail()}`
       );
@@ -251,7 +256,7 @@ function createWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
-    title: "ClipForge",
+    title: "爆米AI",
     backgroundColor: "#0a0a0a",
     webPreferences: { contextIsolation: true, preload: path.join(__dirname, "preload.cjs") },
   });
@@ -260,7 +265,7 @@ function createWindow(url) {
     if (errorCode === -3) return; // ERR_ABORTED: benign (e.g. redirect/navigation), ignore
     log(`页面加载失败 code=${errorCode} desc=${errorDescription} url=${validatedURL}`);
     dialog.showErrorBox(
-      "ClipForge 页面加载失败 / Page load failed",
+      "爆米AI 页面加载失败 / Page load failed",
       `${errorDescription} (${errorCode})\n${validatedURL}\n\n日志 / Log: ${logFilePath || "(不可用)"}`
     );
   });

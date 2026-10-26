@@ -37,4 +37,7 @@ export const LLM_PRESETS: LLMPreset[] = [
   // Pollinations 迁到了 gen.pollinations.ai 并改为「注册领每日免费额度」；旧的免 Key 地址
   // text.pollinations.ai 现已只返回 402/502（issue #19），因此也不再预填占位 Key
   { label: "Pollinations", baseUrl: "https://gen.pollinations.ai/v1", model: "openai-fast", tipKey: "presetPollinationsTip" },
+  // Max API 中转站：deepseek-v4.1-flash 实测接受 temperature（gpt-6-* 系列会 400），
+  // 且带识图能力，可同时充当脚本模型和商品图分析模型。
+  { label: "Max API", baseUrl: "https://max.xiafeng.co/v1", model: "deepseek/deepseek-v4.1-flash", tipKey: "presetMaxrelayTip" },
 ];

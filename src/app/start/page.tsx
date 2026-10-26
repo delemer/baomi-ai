@@ -17,7 +17,7 @@ import { useProductLibraryStore } from "@/lib/stores/product-library-store";
 import { useCharacterStore } from "@/lib/stores/project-store";
 import { getExampleProducts, type ExampleProduct } from "@/lib/examples";
 import { useT, useLocale } from "@/lib/i18n";
-import { ATLAS_KEYS_URL } from "@/lib/atlas-onekey";
+import { MAX_KEYS_URL } from "@/lib/max-onekey";
 import { formatRelativeTime } from "@/lib/relative-time";
 import { classifyTrendTitle, pickDailyTrend, TREND_CATEGORY_IDS } from "@/lib/trends";
 import type { TrendTopic, TrendCategoryId } from "@/lib/trends";
@@ -64,7 +64,7 @@ export default function StartPage() {
   const t = useT("start");
   const locale = useLocale();
   const { llm } = useSettingsStore();
-  const applyAtlasOneKey = useSettingsStore((s) => s.applyAtlasOneKey);
+  const applyMaxOneKey = useSettingsStore((s) => s.applyMaxOneKey);
   const llmReady = llm.apiKey.trim().length > 0;
   // example products follow the UI language
   const examples = getExampleProducts(locale);
@@ -500,7 +500,7 @@ export default function StartPage() {
       const res = await fetch("/api/ai/test-provider", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "atlas-cloud", apiKey: key }),
+        body: JSON.stringify({ name: "max-relay", apiKey: key }),
       });
       const data = await res.json().catch(() => ({ status: "unknown" }));
       // only block on "explicitly invalid"; unknown (network/endpoint uncertainty) passes through and lets generation attempt proceed
@@ -509,7 +509,7 @@ export default function StartPage() {
         setConnecting(false);
         return;
       }
-      applyAtlasOneKey(key);
+      applyMaxOneKey(key);
       setConnecting(false);
       setNeedKey(false);
       await runGeneration();
@@ -810,7 +810,7 @@ export default function StartPage() {
                 </div>
                 <div className="cf-keydesc">
                   {t("atlasDesc")}{" "}
-                  <a href={ATLAS_KEYS_URL} target="_blank" rel="noreferrer">{t("atlasGetKey")} ↗</a>
+                  <a href={MAX_KEYS_URL} target="_blank" rel="noreferrer">{t("atlasGetKey")} ↗</a>
                 </div>
                 <div className="cf-keyrow">
                   <input
@@ -838,7 +838,7 @@ export default function StartPage() {
                 {busy ? (stage || t("busyDefault")) : t("ctaStart")}
                 {!busy && <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M5 12h14M13 6l6 6-6 6" /></svg>}
               </button>
-              <div className="cf-reassure">{t("reassureLead")}<b>Atlas Cloud</b>{t("reassureTail")}</div>
+              <div className="cf-reassure">{t("reassureLead")}<b>Max API</b>{t("reassureTail")}</div>
             </div>
             {error && <div className="cf-err">{error}</div>}
               </>

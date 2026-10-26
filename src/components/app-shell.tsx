@@ -158,7 +158,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-border/50 bg-background/60 transition-[width] md:flex ${collapsed ? "w-14" : "w-56"}`}>
         <Link href="/start" className={`flex items-center gap-2.5 pb-4 pt-5 ${collapsed ? "justify-center px-0" : "px-4"}`}>
           <img src="/icon.svg" alt="" width={30} height={30} className="rounded-[9px]" />
-          {!collapsed && <span className="text-base font-bold tracking-tight">ClipForge</span>}
+          {!collapsed && <span className="text-base font-bold tracking-tight">爆米AI</span>}
         </Link>
         <nav className={`flex-1 space-y-5 overflow-y-auto py-2 ${collapsed ? "px-2" : "px-3"}`}>
           {sections.map((section) => (
@@ -228,7 +228,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-50 flex h-12 items-center justify-between border-b border-border/50 bg-background/80 px-4 backdrop-blur-xl md:hidden">
           <Link href="/start" className="flex items-center gap-2">
             <img src="/icon.svg" alt="" width={24} height={24} className="rounded-[7px]" />
-            <span className="text-sm font-bold tracking-tight">ClipForge</span>
+            <span className="text-sm font-bold tracking-tight">爆米AI</span>
           </Link>
           <div className="flex items-center gap-1">
             <TaskCenter collapsed />

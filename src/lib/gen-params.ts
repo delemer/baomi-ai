@@ -170,6 +170,14 @@ export function buildVideoOptions(p: VideoGenParams | undefined): Record<string,
 export function toEditVariant(modelId: string): string {
   if (modelId === "openai/gpt-image-2") return "openai/gpt-image-2/image-to-image";
   if (modelId === "fal-ai/gpt-image-1.5") return "fal-ai/gpt-image-1.5/edit";
+  // Max API 中转站：文生图与图生图是**两个不同的 model id**，不换 id 会把参考图
+  // 硬发给只做文生的模型（400，且商品保真重绘整条路走不通）。
+  if (modelId === "gpt-image-2.0/text-to-image/economy") return "gpt-image-2.0/edit/economy";
+  if (modelId === "nano-banana-2/text-to-image/economy") return "nano-banana-2/image-to-image/economy";
+  if (modelId === "nano-banana-2-lite/text-to-image/economy") return "nano-banana-2-lite/image-to-image/economy";
+  if (modelId === "gpt-image-2.5-flare/text-to-image") return "gpt-image-2.5-flare/image-to-image";
+  if (modelId === "gpt-image-2.5-sunburst/text-to-image") return "gpt-image-2.5-sunburst/image-to-image";
+  if (modelId === "supersolar-image/text-to-image") return "supersolar-image/image-to-image";
   // Replicate FLUX text-to-image → Kontext edit model
   if (modelId.startsWith("black-forest-labs/flux") && !modelId.includes("kontext")) {
     return "black-forest-labs/flux-kontext-pro";

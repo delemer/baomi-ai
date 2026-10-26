@@ -31,7 +31,10 @@ export const ATLAS_LLM_BASE_URL = "https://api.atlascloud.ai/v1";
 /** Atlas sign-up/landing link with the project referral — the in-app "get a key" CTA
  * targets key-less new users, who must register first anyway (the console deep link
  * bounces logged-out visitors to sign-in). */
-export const ATLAS_KEYS_URL = "https://www.atlascloud.ai?ref=JPM683";
+/** Atlas sign-up/landing link. The upstream default carried the original author's referral code
+ * (`?ref=JPM683`); this fork ships the plain URL so redistributed builds don't funnel new users
+ * into someone else's affiliate account. Replace with your own channel link if you want attribution. */
+export const ATLAS_KEYS_URL = "https://www.atlascloud.ai";
 
 export const ATLAS_ONEKEY_MODELS = {
   /**
