@@ -39,11 +39,22 @@ export function filmTotalSeconds(shots: Shot[]): number {
 /** Fallback model for the one-call film pass, used when the configured model can't take references. */
 export const FILM_FALLBACK_MODEL = "bytedance/seedance-2.5/reference-to-video";
 
+/**
+ * Max API 中转站的参考生视频型号**就是 `seedance-2.5` 本身**，没有 `.../reference-to-video`
+ * 这种变体 id。上游的 fallback 是按 Atlas 的命名写的，直接套到中转站会 404。
+ */
+export const MAX_RELAY_FILM_MODEL = "seedance-2.5";
+
 export interface FilmModelChoice {
   /** The model that will actually be billed */
   model: string;
   /** The configured model this replaced, when the pipeline had to switch away from it */
   swappedFrom?: string;
+}
+
+/** 按 provider 选"整片"的兜底型号：中转站用 seedance-2.5，其余沿用 Atlas 的变体 id。 */
+export function filmFallbackModel(provider?: string | null): string {
+  return provider === "max-relay" ? MAX_RELAY_FILM_MODEL : FILM_FALLBACK_MODEL;
 }
 
 /**
@@ -55,10 +66,13 @@ export interface FilmModelChoice {
  * swap — the pass genuinely cannot run without references — but `swappedFrom` makes it
  * reportable, so callers can show it and take consent before any money moves.
  */
-export function resolveFilmModel(configured?: string | null): FilmModelChoice {
+export function resolveFilmModel(configured?: string | null, provider?: string | null): FilmModelChoice {
   const model = configured?.trim();
   if (model && model.includes("/reference-to-video")) return { model };
-  return { model: FILM_FALLBACK_MODEL, ...(model ? { swappedFrom: model } : {}) };
+  const fallback = filmFallbackModel(provider);
+  // 中转站：用户配的就是 seedance-2.5 时不该报"被替换" —— 它本身就是参考生视频型号。
+  if (model && model === fallback) return { model };
+  return { model: fallback, ...(model ? { swappedFrom: model } : {}) };
 }
 
 /** The model's own longest single generation, when its schema declares a duration enum. */

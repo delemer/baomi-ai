@@ -18,6 +18,7 @@
 import { BaseProvider, ProviderError } from './base'
 import { getDataDir } from '@/lib/paths'
 import { readFile } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import { join, normalize, sep } from 'node:path'
 import type {
   ImageOptions,
@@ -83,6 +84,43 @@ function imageResolutionTier(width?: number, height?: number): '1k' | '2k' {
 function aspectRatioOfImage(width?: number, height?: number): string {
   const r = ratioOf(width, height)
   return r === 'adaptive' ? '1:1' : r
+}
+
+/**
+ * MAX 场景 App 型号 —— 走**另一个端点** `POST /v1/video-generations`（不是 `/v1/videos`）。
+ * 只登记能用 ClipForge 的通用入参（prompt / 首尾帧 / 参考图 / 时长）驱动的那几个；
+ * 需要专用素材槽位的场景（无限换装要 person_image+outfit_N、虚拟 IP 要人像+口播）暂不登记，
+ * 否则用户选中后必然 400。
+ */
+type AppKind = 'literary' | 'action' | 'multiRef' | 'commerce'
+
+const APP_MODELS: Record<string, AppKind> = {
+  'supersolar-literary-drama-app': 'literary',
+  'supersolar-real-person-drama-app': 'action',
+  'supersolar-multi-reference-v2-app': 'multiRef',
+  'supersolar-commerce-app': 'commerce',
+}
+
+/** 文戏/武戏的比例枚举带括号标签，必须整串发送（只发 `9:16` 会 400）。 */
+const DRAMA_RATIO: Record<string, string> = {
+  '1:1': '1:1 (Square)',
+  '2:3': '2:3 (Portrait Photo)',
+  '3:2': '3:2 (Photo)',
+  '3:4': '3:4 (Portrait Standard)',
+  '4:3': '4:3 (Standard)',
+  '9:16': '9:16 (Portrait Widescreen)',
+  '16:9': '16:9 (Widescreen)',
+  '21:9': '21:9 (Ultrawide)',
+}
+
+interface AppTaskObject {
+  id?: string
+  status?: string
+  overall_status?: string
+  stage?: string
+  terminal?: boolean
+  error?: { message?: string; code?: string } | string
+  video?: MaxVideoObject
 }
 
 // ==================== 响应类型 ====================
@@ -162,6 +200,10 @@ const DEFAULT_VIDEO_MODELS = [
   'seedance-2.0-mini',
   'seedance-2.5',
   'vidu-q4-preview',
+  // MAX 场景（走 /v1/video-generations）
+  'supersolar-literary-drama-app',
+  'supersolar-real-person-drama-app',
+  'supersolar-multi-reference-v2-app',
 ]
 
 function mimeFromName(name: string, fallback = 'image/png'): string {
@@ -197,9 +239,15 @@ export class MaxRelayProvider extends BaseProvider {
     }
 
     // 尺寸：优先发 Max 认识的枚举 size；不认识就换算成 aspect_ratio + resolution。
+    //
+    // 但不是每个型号都吃这套：`supersolar-image/*` 的请求体只有 `aspect_ratio`（没有 resolution，
+    // 也没有 size），硬发会被 400 打回 —— `{"code":"invalid_image_request","field":"resolution",
+    // "message":"当前图片模型不支持指定清晰度。"}`。`nano-banana-2-lite` 只接受 1k。
     const w = options.width
     const h = options.height
     const openaiSize = options.extra?.size
+    const noResolution = /^supersolar-image\//i.test(options.modelId)
+    const liteOnly1k = /nano-banana-2-lite/i.test(options.modelId)
     if (typeof openaiSize === 'string' && IMAGE_SIZE_ENUM.has(openaiSize)) {
       body.size = openaiSize
     } else if (w && h) {
@@ -208,7 +256,7 @@ export class MaxRelayProvider extends BaseProvider {
         body.size = exact
       } else {
         body.aspect_ratio = aspectRatioOfImage(w, h)
-        body.resolution = imageResolutionTier(w, h)
+        if (!noResolution) body.resolution = liteOnly1k ? '1k' : imageResolutionTier(w, h)
       }
     }
     if (typeof options.seed === 'number' && Number.isFinite(options.seed)) body.seed = options.seed
@@ -227,12 +275,7 @@ export class MaxRelayProvider extends BaseProvider {
       else body.image_urls = urls
     }
 
-    const res = await this.request<MaxImageResponse>('/images/generations', {
-      method: 'POST',
-      body,
-      timeout: 180000,
-      idempotent: false,
-    })
+    const res = await this.postImage(body)
 
     const imageUrls = (res.data ?? [])
       .map((d) => d.url ?? (d.b64_json ? `data:image/png;base64,${d.b64_json}` : ''))
@@ -249,9 +292,88 @@ export class MaxRelayProvider extends BaseProvider {
     }
   }
 
+  /**
+   * 发图片请求，处理中转站图片接口的两种形态：
+   *
+   *  1. **同步**：直接返回 `{created, data:[...]}`（gpt-image 系实测 ~30s 内返回）。
+   *  2. **异步**：部分型号（实测 `supersolar-image/*`）在网关超时后返回
+   *     `504 {"error":{"code":"image_task_pending", "task_id":"task_xxx","status_url":...}}` ——
+   *     任务其实**已经受理并在跑**，必须按 task_id 轮询 `/images/tasks/{id}`，
+   *     否则用户会看到"请求失败"但钱已经花掉。
+   *
+   * 另外：不同型号吃的尺寸字段不同（supersolar 没有 resolution），服务端点名哪个字段不可用就摘掉重放一次。
+   */
+  private async postImage(body: Record<string, unknown>): Promise<MaxImageResponse> {
+    const payload: Record<string, unknown> = { ...body }
+    const droppable = ['resolution', 'aspect_ratio', 'size'] as const
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await this.request<MaxImageResponse>('/images/generations', {
+          method: 'POST',
+          body: payload,
+          timeout: 180000,
+          idempotent: false,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : ''
+
+        // 异步受理：拿到任务 id 就转轮询，不要当成失败
+        const pendingTaskId =
+          /"task_id"\s*:\s*"(task_[A-Za-z0-9]+)"/.exec(msg)?.[1] ??
+          (msg.includes('image_task_pending') ? /\b(task_[A-Za-z0-9]{8,})\b/.exec(msg)?.[1] : undefined)
+        if (pendingTaskId) return this.pollImageTask(pendingTaskId)
+
+        const blamed = droppable.find(
+          (k) => payload[k] !== undefined && new RegExp(`"field"\\s*:\\s*"${k}"`).test(msg),
+        )
+        if (attempt >= 2 || !blamed) throw err
+        delete payload[blamed]
+      }
+    }
+  }
+
+  /** 轮询异步图片任务，直到出图；FAILED 才抛错。 */
+  private async pollImageTask(taskId: string): Promise<MaxImageResponse> {
+    const intervalMs = 3000
+    const maxAttempts = 120 // ≈6 分钟；出图实测 1–3 分钟，给足余量
+    let lastStatus = ''
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const task = await this.request<{
+        id?: string
+        status?: string
+        error?: { message?: string; code?: string }
+        data?: Array<{ url?: string; b64_json?: string }>
+      }>(`/images/tasks/${encodeURIComponent(taskId)}`, { timeout: 60000 })
+      const status = String(task.status ?? '').toLowerCase()
+      lastStatus = status
+      if (status === 'completed') {
+        const data = task.data ?? []
+        if (data.length === 0) {
+          throw new ProviderError(`图片任务已完成但没有返回图片（${taskId}）`, 'NO_IMAGES', this.name)
+        }
+        return { created: Math.floor(Date.now() / 1000), data }
+      }
+      if (status === 'failed') {
+        const message = typeof task.error === 'string' ? task.error : task.error?.message
+        throw new ProviderError(`图片生成失败: ${message ?? '未知错误'}（${taskId}）`, 'API_ERROR', this.name)
+      }
+      // queued / in_progress / unknown / submission_uncertain 都继续等
+      await new Promise((r) => setTimeout(r, intervalMs))
+    }
+    throw new ProviderError(
+      `图片任务轮询超时（${taskId}，最后状态 ${lastStatus || '?'}）——任务可能仍在云端执行，请勿重复提交`,
+      'POLL_TIMEOUT',
+      this.name,
+    )
+  }
+
   // ---------- 视频 ----------
 
   async submitVideoTask(options: VideoOptions): Promise<{ taskId: string; modelId: string }> {
+    // MAX 场景 App 型号走另一个端点（/v1/video-generations），单独分流
+    const appKind = APP_MODELS[options.modelId]
+    if (appKind) return this.submitAppTask(options, appKind)
+
     const family = videoFamilyOf(options.modelId)
     const parameters: Record<string, unknown> = {
       seconds: this.normalizeSeconds(options.duration),
@@ -287,20 +409,27 @@ export class MaxRelayProvider extends BaseProvider {
     }
 
     const generationMode = wantsImageToVideo ? 'image_to_video' : 'text_to_video'
+    /** 带了参考图但没有首帧 = 参考生视频（多参/整片走这条） */
+    const wantsReference = assets.length > 0 && !options.firstFrameUrl
     if (family === 'wan' || family === 'vidu' || family === 'seedance2' || family === 'generic') {
-      parameters.generation_mode = assets.length > 0 && !options.firstFrameUrl ? 'reference_to_video' : generationMode
+      parameters.generation_mode = wantsReference ? 'reference_to_video' : generationMode
     }
     // 各族独有的"显式关闭"开关：不传会走服务端默认，可能白花钱生成音频。
-    if (family === 'wan') parameters.audio = false
+    // audioEnabled 为 true 时（整片的对白就在画面里）必须显式打开。
+    if (family === 'wan') parameters.audio = options.audioEnabled === true
     if (family === 'seedance2') {
-      parameters.generate_audio = false
+      parameters.generate_audio = options.audioEnabled === true
       parameters.return_last_frame = true
     }
     if (family === 'seedance25') {
+      // seedance-2.5 没有 generation_mode，改用 omni_reference_task_type 声明任务类型；
+      // 不声明时服务端按 auto 处理，会把整片的参考图当成普通首帧，丢掉 @图片N 的语义。
+      if (wantsReference) parameters.omni_reference_task_type = 'reference'
       if (options.lastFrameUrl) parameters.return_last_frame = true
+      parameters.generate_audio = options.audioEnabled === true
     }
     if (family === 'vidu') {
-      parameters.audio = false
+      parameters.audio = options.audioEnabled === true
       parameters.watermark = false
     }
 
@@ -324,6 +453,94 @@ export class MaxRelayProvider extends BaseProvider {
     return { taskId, modelId: res.model ?? options.modelId }
   }
 
+  /**
+   * MAX 场景 App 任务：走 `POST /v1/video-generations`（不是 `/v1/videos`）。
+   *
+   * 契约与标准视频完全不同：
+   *  - 必填 `request_id`（账户内唯一，重试要保留原值）+ `model` + `prompt`；
+   *  - 生成参数在 `parameters`，素材在 `assets: [{asset_id, slot}]`（先 POST /v1/assets 上传换 id）；
+   *  - 文戏用 `first_frame`/`last_frame` 槽位并用 `generation_mode` 声明 0/1/2/3；
+   *    其余场景用 `image_1..9`；
+   *  - 文戏/武戏的 `ratio` 是**带括号标签的整串**（`9:16 (Portrait Widescreen)`），只发 `9:16` 会 400。
+   */
+  private async submitAppTask(
+    options: VideoOptions,
+    kind: AppKind,
+  ): Promise<{ taskId: string; modelId: string }> {
+    const ratio = ratioOf(options.width, options.height)
+    // 文戏/武戏的 resolution 枚举只有 720P/1080P（没有 480P），480p 档要上抬，否则 400；
+    // 多参生视频与 commerce 支持 480P。
+    const rawTier = resolutionTierOf(options.width, options.height)
+    const tier = kind === 'literary' || kind === 'action' ? (rawTier === '480P' ? '720P' : rawTier) : rawTier
+    const seconds = this.normalizeSeconds(options.duration)
+
+    const assets: Array<{ asset_id: string; slot: string }> = []
+    const pushAsset = async (ref: string, slot: string) => {
+      const asset = await this.uploadAsset(ref)
+      assets.push({ asset_id: asset.id, slot })
+    }
+
+    if (kind === 'literary') {
+      if (options.firstFrameUrl) await pushAsset(options.firstFrameUrl, 'first_frame')
+      if (options.lastFrameUrl) await pushAsset(options.lastFrameUrl, 'last_frame')
+    } else {
+      if (options.firstFrameUrl) await pushAsset(options.firstFrameUrl, 'image_1')
+      if (options.lastFrameUrl) await pushAsset(options.lastFrameUrl, 'image_2')
+    }
+    let imageIndex = kind === 'literary' ? 1 : assets.length + 1
+    for (const ref of (options.referenceImageUrls ?? []).slice(0, 8)) {
+      await pushAsset(ref, `image_${imageIndex++}`)
+    }
+
+    // 比例枚举分两种：文戏/武戏是带括号标签的整串，commerce / 多参是纯 `9:16`。
+    const plainRatio = ratio === 'adaptive' ? '9:16' : ratio
+    const dramaRatio = DRAMA_RATIO[ratio] ?? DRAMA_RATIO['9:16']
+    const parameters: Record<string, unknown> =
+      kind === 'multiRef'
+        ? {
+            seconds,
+            resolution: tier,
+            ratio: plainRatio,
+            motion_type: 'standard',
+            duration_mode: 'manual',
+          }
+        : kind === 'commerce'
+          ? { seconds: Math.round(seconds), resolution: tier, ratio: plainRatio }
+          : {
+              seconds: Math.round(seconds),
+              resolution: tier,
+              ratio: dramaRatio,
+              ...(kind === 'literary' && { generation_mode: this.dramaMode(options) }),
+            }
+
+    const res = await this.request<AppTaskObject>('/video-generations', {
+      method: 'POST',
+      body: {
+        request_id: randomUUID(),
+        model: options.modelId,
+        prompt: options.prompt,
+        parameters,
+        ...(assets.length > 0 && { assets }),
+      },
+      // 场景任务要排队+优化提示词，提交本身可能较慢；计费 POST 绝不自动重试
+      timeout: 240000,
+      idempotent: false,
+    })
+    const taskId = res.id
+    if (!taskId || typeof taskId !== 'string') {
+      throw new ProviderError('场景任务未返回任务 ID，请到中转站后台核对，勿直接重复提交', 'NO_TASK_ID', this.name)
+    }
+    return { taskId, modelId: options.modelId }
+  }
+
+  /** 文戏的 generation_mode：0=参考图/纯文生，1=首帧，2=尾帧，3=首尾帧（必须发字符串）。 */
+  private dramaMode(options: VideoOptions): string {
+    if (options.firstFrameUrl && options.lastFrameUrl) return '3'
+    if (options.firstFrameUrl) return '1'
+    if (options.lastFrameUrl) return '2'
+    return '0'
+  }
+
   async generateVideo(options: VideoOptions): Promise<VideoResult> {
     const { taskId } = await this.submitVideoTask(options)
     const status = await this.waitForTask(taskId)
@@ -331,6 +548,22 @@ export class MaxRelayProvider extends BaseProvider {
   }
 
   async getTaskStatus(taskId: string): Promise<TaskStatus> {
+    // 场景任务的 id 前缀是 `generation_`（标准视频是 `task_`）：前缀就能确定端点，
+    // 不用先打一次 /videos 拿 400 再回退 —— 轮询是高频路径，省掉的每次都是实打实的延迟。
+    if (taskId.startsWith('generation_')) return await this.getAppTaskStatus(taskId)
+    try {
+      return await this.getStandardTaskStatus(taskId)
+    } catch (err) {
+      // 场景 App 任务不在 /videos 下 —— 对未实现 OpenAI 兼容转换的型号该端点回 400/404/501。
+      // 换 /video-generations 再查一次；都不是可恢复码就按原错误抛出。
+      const code = (err as { statusCode?: number }).statusCode
+      if (code === 400 || code === 404 || code === 501) return await this.getAppTaskStatus(taskId)
+      throw err
+    }
+  }
+
+  /** 标准视频任务（seedance / wan / vidu）的状态查询。 */
+  private async getStandardTaskStatus(taskId: string): Promise<TaskStatus> {
     const res = await this.request<MaxVideoObject>(`/videos/${encodeURIComponent(taskId)}`, { timeout: 60000 })
     const rawStatus = String(res.status ?? '').toLowerCase()
     const mapped = STATUS_MAP[rawStatus]
@@ -367,6 +600,51 @@ export class MaxRelayProvider extends BaseProvider {
     return status
   }
 
+  /**
+   * 场景 App 任务的状态查询（/v1/video-generations/{id}）。
+   *
+   * 判断"是否完成"要看 `overall_status` + `terminal`（`status` 只是受理流程状态，不能用来判断终态）；
+   * 成片在 `video` 字段里，是一个 PublicOpenAIVideo，它的 `id` 才是取片用的 id。
+   */
+  private async getAppTaskStatus(taskId: string): Promise<TaskStatus> {
+    const res = await this.request<AppTaskObject>(`/video-generations/${encodeURIComponent(taskId)}`, {
+      timeout: 60000,
+    })
+    const raw = String(res.overall_status ?? res.status ?? '').toLowerCase()
+    const mapped = STATUS_MAP[raw]
+    if (!mapped) {
+      const err = new ProviderError(`未知场景任务状态: ${raw || '?'}`, 'UNKNOWN_STATUS', this.name)
+      err.taskId = taskId
+      throw err
+    }
+    const status: TaskStatus = {
+      taskId,
+      status: mapped,
+      ...(res.stage && { extra: { stage: res.stage } }),
+      ...(res.error && {
+        error: typeof res.error === 'string' ? res.error : res.error.message,
+        errorCode: typeof res.error === 'string' ? undefined : res.error.code,
+      }),
+    }
+    if (mapped === 'completed') {
+      const video = res.video
+      if (!video?.id) {
+        throw new ProviderError('场景任务已完成但没有返回视频 ID', 'NO_RESULT', this.name)
+      }
+      const videoUrl = await downloadProviderVideo(
+        `${this.config.baseUrl}/videos/${encodeURIComponent(video.id)}/content`,
+        this.getAuthHeaders() as Record<string, string>,
+      )
+      status.result = {
+        taskId,
+        modelId: video.model ?? '',
+        videoUrls: [videoUrl],
+        ...(video.seconds && { duration: Number(video.seconds) }),
+      }
+    }
+    return status
+  }
+
   // ---------- 模型清单 ----------
 
   async listModels(mediaType?: MediaType): Promise<Model[]> {
@@ -383,10 +661,10 @@ export class MaxRelayProvider extends BaseProvider {
       const liveVideo = rows
         .filter((m) => Array.isArray(m.supported_endpoint_types) && m.supported_endpoint_types.includes(EPS_VIDEO) && m.id)
         .map((m) => m.id as string)
-        // `*-app` 是"场景创作"包装模型（虚拟 IP / 换装 / 武戏），参数是另一套
-        // （MaxVirtualIPParameters 等，需要人物图/音色等固定素材），本适配器驱动不了，
-        // 放进下拉框只会让用户选中后必然失败。
-        .filter((id) => !id.endsWith('-app'))
+        // `*-app` 是"场景创作"型号：契约完全不同（走 /v1/video-generations + 素材槽位）。
+        // 只放行本适配器真正能驱动的几个；无限换装（要 person_image+outfit_N）和
+        // 虚拟 IP（要人像+口播文本）需要专用入口，放进来只会让用户选中后必然失败。
+        .filter((id) => !id.endsWith('-app') || Boolean(APP_MODELS[id]))
       if (liveImage.length || liveVideo.length) {
         imageIds = liveImage.length ? liveImage : imageIds
         videoIds = liveVideo.length ? liveVideo : videoIds

@@ -18,7 +18,15 @@ import { JUDGE_META, type JudgeReport, autoApplicableRewrites, autoApplicableDes
 import { useTemplateStore } from "@/lib/stores/template-store";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { useCharacterStore } from "@/lib/stores/project-store";
-import { resolveDefaultModelTarget, buildImageOptions, buildVideoOptions, toEditVariant } from "@/lib/gen-params";
+import {
+  resolveDefaultModelTarget,
+  buildImageOptions,
+  buildVideoOptions,
+  toEditVariant,
+  videoSize,
+  type GenResolution,
+  type GenAspectRatio,
+} from "@/lib/gen-params";
 import { useT, useLocale } from "@/lib/i18n";
 import { STAGE_LABEL_KEYS } from "@/lib/pipeline-stages";
 import { friendlyError } from "@/lib/friendly-error";
@@ -41,6 +49,19 @@ const styleLabelKeys: Record<string, string> = {
   comparison: "styleComparison",
   story: "styleStory",
 };
+
+// 整片预览里的出片规格：画质三档（480p 是省钱档）+ 三种画面比例。
+// 放在生成确认这一步而不是设置页——同一台机器上不同片子想用不同档位，成本也在这里当场可见。
+const filmResolutionOptions: { value: GenResolution; labelKey: string }[] = [
+  { value: "480p", labelKey: "aiFilmQuality480" },
+  { value: "720p", labelKey: "aiFilmQuality720" },
+  { value: "1080p", labelKey: "aiFilmQuality1080" },
+];
+const filmAspectOptions: { value: GenAspectRatio; labelKey: string }[] = [
+  { value: "9:16", labelKey: "aiFilmRatio916" },
+  { value: "16:9", labelKey: "aiFilmRatio169" },
+  { value: "1:1", labelKey: "aiFilmRatio11" },
+];
 
 // structure of a script row returned from the backend scripts table
 interface DbScript {
@@ -508,6 +529,16 @@ export default function ScriptPage() {
   /** Ticked by the user to allow a generation whose estimate exceeds their spend cap */
   const [overCapAck, setOverCapAck] = useState(false);
   const [aiFilmError, setAiFilmError] = useState("");
+  // 出片规格：初始值取设置里的默认（defaultResolution / defaultAspectRatio），之后在预览卡片里
+  // 临时改，只作用于这一条片——不写回全局设置（设置页也不再固定画质）。
+  const defaultResolution = useSettingsStore((st) => st.defaultResolution);
+  const defaultAspectRatio = useSettingsStore((st) => st.defaultAspectRatio);
+  const [filmResolutionDraft, setFilmResolutionDraft] = useState<GenResolution | null>(null);
+  const [filmAspectRatioDraft, setFilmAspectRatioDraft] = useState<GenAspectRatio | null>(null);
+  const filmResolution = filmResolutionDraft ?? defaultResolution;
+  const filmAspectRatio = filmAspectRatioDraft ?? defaultAspectRatio;
+  /** 改规格后正在重拉免费预览（花费重估中） */
+  const [specRefreshing, setSpecRefreshing] = useState(false);
   /** dryRun preview of the film pass — the paid submit needs an explicit confirm on this exact prompt */
   const [filmPreview, setFilmPreview] = useState<{
     prompt: string;
@@ -525,10 +556,27 @@ export default function ScriptPage() {
     dialogueWarnings: { index: number; seconds: number; count: number; limit: number }[];
     /** Absent when the platform publishes no price — render that as unknown, never as free */
     estimate?: { unitUsd: number; seconds: number; minUsd: number; maxUsd: number; tierMultiplier: number };
+    /** 这份预览是按哪个规格估的——提交时以它为准，避免"显示的价"和"提交的规格"不一致 */
+    spec: { resolution: GenResolution; aspectRatio: GenAspectRatio };
   } | null>(null);
 
-  /** Free dryRun call — full film prompt + counts + warnings, nothing submitted, nothing billed. */
-  const fetchFilmPreview = async (scriptId: string) => {
+  /** 预览与付费提交共用的出片选项：width/height 只由这里的规格决定（画质 + 比例 → videoSize）。
+   *  设置里的其它视频参数（duration/fps/seed…）继续生效，但尺寸不交给设置页。 */
+  const filmSizeOptions = (resolution: GenResolution, aspectRatio: GenAspectRatio): Record<string, unknown> => {
+    const s = useSettingsStore.getState();
+    const { width, height } = videoSize(resolution, aspectRatio);
+    return { ...(s.videoParams ? buildVideoOptions(s.videoParams) : {}), width, height };
+  };
+
+  /** Free dryRun call — full film prompt + counts + warnings, nothing submitted, nothing billed.
+   *  `spec` 是预览卡片里选的画质/比例；不传则用当前选择。它决定 options.width/height，
+   *  因此「预估花费」会随档位变化（480p 基准价 / 720p 约 2 倍 / 1080p 约 4.5 倍）。 */
+  const fetchFilmPreview = async (
+    scriptId: string,
+    spec?: { resolution: GenResolution; aspectRatio: GenAspectRatio }
+  ) => {
+    const resolution = spec?.resolution ?? filmResolution;
+    const aspectRatio = spec?.aspectRatio ?? filmAspectRatio;
     const presenter = presenterLib.find((c) => c.id === presenterParam);
     const res = await fetch(`/api/project/${id}/storyboard-film`, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -538,6 +586,8 @@ export default function ScriptPage() {
         // preview the CONFIGURED model: the route resolves it the same way the paid submit does,
         // so a forced switch shows up in the confirm card instead of only on the invoice (issue #28)
         model: useSettingsStore.getState().defaultVideoModel,
+        // 画质/比例在这里生效：dryRun 用同一份 options 估算价位档，付费提交也用同一份
+        options: filmSizeOptions(resolution, aspectRatio),
         // a picked presenter WILL ride as a reference sheet (generated on demand later), so the
         // preview must count its slot now — the dryRun branch only reads truthiness
         ...(presenter && { characterSheetUrl: presenter.referenceImages?.[0] ?? "planned" }),
@@ -545,7 +595,31 @@ export default function ScriptPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || t("aiFilmFailed"));
-    return data as NonNullable<typeof filmPreview>;
+    return { ...(data as NonNullable<typeof filmPreview>), spec: { resolution, aspectRatio } };
+  };
+
+  /** 改画质/比例 = 改价：立刻重拉一次免费 dryRun，让「预估花费」按新档位重算。
+   *  只改本地临时选择，不写回设置里的默认值。失败则退回上一次成功预览的规格。 */
+  const changeFilmSpec = async (next: { resolution?: GenResolution; aspectRatio?: GenAspectRatio }) => {
+    const resolution = next.resolution ?? filmResolution;
+    const aspectRatio = next.aspectRatio ?? filmAspectRatio;
+    if (resolution === filmResolution && aspectRatio === filmAspectRatio) return;
+    setFilmResolutionDraft(resolution);
+    setFilmAspectRatioDraft(aspectRatio);
+    setOverCapAck(false); // a fresh estimate must be acknowledged on its own merits
+    if (!currentScript) return;
+    setSpecRefreshing(true);
+    setAiFilmError("");
+    try {
+      setFilmPreview(await fetchFilmPreview(currentScript.id, { resolution, aspectRatio }));
+    } catch (err) {
+      // 预估失败就退回已成功预览的规格：宁可显示旧价，也不能显示一个价、提交另一个规格
+      setFilmResolutionDraft(filmPreview?.spec.resolution ?? null);
+      setFilmAspectRatioDraft(filmPreview?.spec.aspectRatio ?? null);
+      setAiFilmError(friendlyError(err, locale));
+    } finally {
+      setSpecRefreshing(false);
+    }
   };
 
   // Phase 1 — quality + preview, all free: judge pass rewrites weak lines first, then a dryRun
@@ -566,7 +640,12 @@ export default function ScriptPage() {
       await runJudgePass(currentScript.id, setAiFilmStage);
       setAiFilmStage(t("aiFilmPreviewing"));
       setOverCapAck(false); // a fresh estimate must be acknowledged on its own merits
-      setFilmPreview(await fetchFilmPreview(currentScript.id));
+      // 每次新预览都从设置里的默认规格起步（之后的临时改动不写回设置）
+      const s = useSettingsStore.getState();
+      const spec = { resolution: s.defaultResolution, aspectRatio: s.defaultAspectRatio };
+      setFilmResolutionDraft(null);
+      setFilmAspectRatioDraft(null);
+      setFilmPreview(await fetchFilmPreview(currentScript.id, spec));
       setAiFilming(false); // hand over to the preview card; nothing has been billed yet
     } catch (err) {
       setAiFilmError(friendlyError(err, locale));
@@ -582,7 +661,9 @@ export default function ScriptPage() {
     setAiFilmError("");
     try {
       setAiFilmStage(t("aiFilmVerifying"));
-      const fresh = await fetchFilmPreview(currentScript.id);
+      // 用"被确认的那份预览"的规格重拉一次：比的是同一套画质/比例，提交也用它
+      const previewSpec = filmPreview.spec ?? { resolution: filmResolution, aspectRatio: filmAspectRatio };
+      const fresh = await fetchFilmPreview(currentScript.id, previewSpec);
       if (fresh.prompt !== filmPreview.prompt) {
         // stale confirmation: show the new preview instead of submitting outdated content
         setFilmPreview(fresh);
@@ -662,7 +743,8 @@ export default function ScriptPage() {
           apiKey: vidTarget.apiKey,
           baseUrl: vidTarget.baseUrl,
           ...(sheet && { characterSheetUrl: sheet }),
-          options: buildVideoOptions(s.videoParams ? { ...s.videoParams, aspectRatio: "9:16" } : undefined),
+          // 尺寸只来自预览卡片里选的规格（画质 + 比例），不再取设置页的默认值
+          options: filmSizeOptions(previewSpec.resolution, previewSpec.aspectRatio),
         }),
       });
       const filmData = await filmRes.json().catch(() => ({}));
@@ -887,6 +969,51 @@ export default function ScriptPage() {
               {aiFilmError && (
                 <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-xs text-destructive">{aiFilmError}</div>
               )}
+              {/* 出片规格：画质/比例在花钱这一步现场挑（480p 省钱档也在这），改一次就重估一次花费 */}
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span className="font-semibold">{t("aiFilmSpecTitle")}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground">{t("aiFilmQualityLabel")}</span>
+                    {filmResolutionOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={specRefreshing}
+                        onClick={() => void changeFilmSpec({ resolution: opt.value })}
+                        className={`min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          filmResolution === opt.value
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border/60 bg-background hover:border-primary/30"
+                        }`}
+                      >
+                        {t(opt.labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-muted-foreground">{t("aiFilmRatioLabel")}</span>
+                    {filmAspectOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        disabled={specRefreshing}
+                        onClick={() => void changeFilmSpec({ aspectRatio: opt.value })}
+                        className={`min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          filmAspectRatio === opt.value
+                            ? "border-primary/50 bg-primary/10 text-primary"
+                            : "border-border/60 bg-background hover:border-primary/30"
+                        }`}
+                      >
+                        {t(opt.labelKey)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="mt-1.5 text-muted-foreground">
+                  {specRefreshing ? t("aiFilmSpecRefreshing") : t("aiFilmSpecHint")}
+                </p>
+              </div>
               <div className="rounded-lg border border-border/60 bg-muted/30 px-4 py-2.5 text-xs">
                 {filmPreview.estimate ? (
                   <>

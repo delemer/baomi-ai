@@ -23,9 +23,6 @@ import { useT } from "@/lib/i18n";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { MAX_KEYS_URL, MAX_ONEKEY_MODELS } from "@/lib/max-onekey";
 
-type Resolution = "720p" | "1080p";
-type Ratio = "9:16" | "16:9" | "1:1";
-
 /** 把模型 id 折叠成人话，避免在极简页里出现一长串技术字符串。 */
 function friendlyModel(id: string | undefined): string {
   if (!id) return "—";
@@ -45,14 +42,10 @@ export default function SimpleSettingsPage() {
   const t = useT("settings");
   const providers = useSettingsStore((s) => s.providers);
   const llm = useSettingsStore((s) => s.llm);
-  const defaultResolution = useSettingsStore((s) => s.defaultResolution);
-  const defaultAspectRatio = useSettingsStore((s) => s.defaultAspectRatio);
   const spendCapUsd = useSettingsStore((s) => s.spendCapUsd);
   const defaultImageModel = useSettingsStore((s) => s.defaultImageModel);
   const defaultVideoModel = useSettingsStore((s) => s.defaultVideoModel);
   const applyMaxOneKey = useSettingsStore((s) => s.applyMaxOneKey);
-  const setDefaultResolution = useSettingsStore((s) => s.setDefaultResolution);
-  const setDefaultAspectRatio = useSettingsStore((s) => s.setDefaultAspectRatio);
   const setSpendCapUsd = useSettingsStore((s) => s.setSpendCapUsd);
 
   const [keyDraft, setKeyDraft] = useState("");
@@ -69,16 +62,6 @@ export default function SimpleSettingsPage() {
     setSaved(true);
     setTimeout(() => setSaved(false), 4000);
   };
-
-  const resolutionOptions: { value: Resolution; labelKey: string }[] = [
-    { value: "720p", labelKey: "simpleQualityStd" },
-    { value: "1080p", labelKey: "simpleQualityHigh" },
-  ];
-  const ratioOptions: { value: Ratio; labelKey: string }[] = [
-    { value: "9:16", labelKey: "simpleRatio916" },
-    { value: "16:9", labelKey: "simpleRatio169" },
-    { value: "1:1", labelKey: "simpleRatio11" },
-  ];
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
@@ -145,51 +128,11 @@ export default function SimpleSettingsPage() {
         </CardContent>
       </Card>
 
-      {/* ② 出片质量 —— 用"贵/便宜"替代技术参数 */}
+      {/* ② 花费保护 —— 只留"花多少钱"这道闸，画质/比例移到生成前的整片预览里选 */}
       <Card className="mb-5 glass-card">
         <CardContent className="p-5">
-          <h2 className="mb-1 text-sm font-semibold">{t("simpleQualityTitle")}</h2>
-          <p className="mb-4 text-xs text-muted-foreground">{t("simpleQualityHint")}</p>
-
-          <div className="mb-4 space-y-1.5">
-            <Label className="text-xs text-muted-foreground">{t("simpleQualityLabel")}</Label>
-            <div className="flex flex-wrap gap-2">
-              {resolutionOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDefaultResolution(opt.value)}
-                  className={`min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors ${
-                    defaultResolution === opt.value
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background hover:border-primary/30"
-                  }`}
-                >
-                  {t(opt.labelKey as Parameters<typeof t>[0])}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="mb-4 space-y-1.5">
-            <Label className="text-xs text-muted-foreground">{t("simpleRatioLabel")}</Label>
-            <div className="flex flex-wrap gap-2">
-              {ratioOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDefaultAspectRatio(opt.value)}
-                  className={`min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors ${
-                    defaultAspectRatio === opt.value
-                      ? "border-primary/50 bg-primary/10 text-primary"
-                      : "border-border/60 bg-background hover:border-primary/30"
-                  }`}
-                >
-                  {t(opt.labelKey as Parameters<typeof t>[0])}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h2 className="mb-1 text-sm font-semibold">{t("simpleSpendTitle")}</h2>
+          <p className="mb-4 text-xs text-muted-foreground">{t("simpleSpendHint")}</p>
 
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">{t("simpleCapLabel")}</Label>
@@ -206,6 +149,10 @@ export default function SimpleSettingsPage() {
             </div>
             <p className="text-xs text-muted-foreground">{t("simpleCapHint")}</p>
           </div>
+
+          <p className="mt-3 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+            {t("simpleQualityMovedHint")}
+          </p>
         </CardContent>
       </Card>
 

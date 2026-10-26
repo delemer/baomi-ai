@@ -208,9 +208,65 @@ describe("submitVideoTask", () => {
       provider.submitVideoTask({ modelId: "wan-3.0", mode: "text-to-video", prompt: "p", duration: 5 }),
     ).rejects.toMatchObject({ code: "NO_TASK_ID" });
   });
+
+  it("MAX 场景型号走 /video-generations（带 request_id），文戏用带标签的比例并抬到 720P", async () => {
+    const calls = stubFetch(() => jsonResponse({ id: "generation_abc", overall_status: "queued" }));
+
+    const out = await provider.submitVideoTask({
+      modelId: "supersolar-literary-drama-app",
+      mode: "text-to-video",
+      prompt: "一个人站在窗边",
+      // 480p 对文戏不合法（枚举只有 720P/1080P），应被抬到 720P
+      width: 480,
+      height: 854,
+      duration: 5,
+    });
+
+    expect(out.taskId).toBe("generation_abc");
+    expect(calls[0].url).toBe(`${BASE}/video-generations`);
+    const body = JSON.parse(String(calls[0].init?.body));
+    expect(body.request_id).toBeTruthy();
+    expect(body.model).toBe("supersolar-literary-drama-app");
+    expect(body.parameters).toMatchObject({
+      seconds: 5,
+      resolution: "720P",
+      ratio: "9:16 (Portrait Widescreen)",
+      generation_mode: "0",
+    });
+    expect(body.assets).toBeUndefined();
+  });
+
+  it("多参生视频用纯比例 + 480P，并带 motion_type/duration_mode", async () => {
+    const calls = stubFetch(() => jsonResponse({ id: "generation_mr" }));
+    await provider.submitVideoTask({
+      modelId: "supersolar-multi-reference-v2-app",
+      mode: "text-to-video",
+      prompt: "p",
+      width: 480,
+      height: 854,
+      duration: 8,
+    });
+    const body = JSON.parse(String(calls[0].init?.body));
+    expect(body.parameters).toMatchObject({
+      seconds: 8,
+      resolution: "480P",
+      ratio: "9:16",
+      motion_type: "standard",
+      duration_mode: "manual",
+    });
+  });
 });
 
 describe("getTaskStatus", () => {
+  it("generation_ 前缀直接查场景端点，不先打 /videos", async () => {
+    const provider = new MaxRelayProvider({ name: "max-relay", apiKey: "k", baseUrl: BASE });
+    const calls = stubFetch(() => jsonResponse({ id: "generation_1", overall_status: "in_progress", terminal: false }));
+    const status = await provider.getTaskStatus("generation_1");
+    expect(status.status).toBe("processing");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(`${BASE}/video-generations/generation_1`);
+  });
+
   afterEach(() => vi.unstubAllGlobals());
 
   it("unknown 视为未完成（不能抛 UNKNOWN_STATUS）", async () => {

@@ -63,6 +63,35 @@
 - 应用内 9 处 `?tab=` 深链已改指：配置 Key 类 → 极简页；模型 / 平台类 → 高级页。
 - i18n：新增 `simple*` / `advancedTitle` 等词条（中英成对）。
 
+### 5.1 MAX 场景型号接入（第二批）
+
+Max API 的 `supersolar-*-app` 系列走**另一个端点** `POST /v1/video-generations`（不是 `/v1/videos`），
+请求体必填 `request_id`、参数在 `parameters`、素材是 `assets:[{asset_id, slot}]`（需先 `POST /v1/assets`）。
+第一批实现时被整体过滤掉了；第二批按各自契约接入其中三个：
+
+| 型号 | 映射方式 |
+|---|---|
+| `supersolar-literary-drama-app`（文戏） | 首/尾帧 → `first_frame`/`last_frame`；`generation_mode` 按帧位取 0/1/2/3；比例是带括号标签的整串（`9:16 (Portrait Widescreen)`）；无 480P（上抬到 720P） |
+| `supersolar-real-person-drama-app`（真人剧） | 参考帧 → `image_1..N`；同上比例/分辨率规则 |
+| `supersolar-multi-reference-v2-app`（多参生视频） | 参考图 → `image_1..9`；`motion_type`/`duration_mode` 显式传；支持 480P，最长 60 秒 |
+
+任务 id 形如 `generation_*`：状态查询按前缀直接走 `/video-generations/{id}`（终态看 `overall_status` + `terminal`，
+成片在 `video` 字段，取片仍用 `/v1/videos/{video.id}/content`）。实测文戏 5 秒 720P 约 2.5 分钟出片、带 AAC 音轨。
+
+**仍未接入**：`supersolar-infinite-outfit-app`（需 `person_image` + `outfit_1..4`）、
+`supersolar-virtual-ip-v2-app`（需人像 + 口播文本/音色）、`supersolar-video-remix-app`（需源视频槽位）——
+它们的必填素材槽位在 ClipForge 的通用视频调用里没有对应来源，接之前需要各自做专用入口。
+
+### 5.2 图片与整片链路的三个契约修复
+
+- **文生图尺寸字段**：`supersolar-image/*` 的请求体没有 `resolution`，硬发会被 400
+  （`invalid_image_request`）。现在按型号预判 + 服务端点名字段时自动摘掉重放（最多两个字段）。
+- **异步出图**：部分图片型号超时后返回 `504 image_task_pending` + `task_id`，任务其实已受理。
+  适配器改为轮询 `/v1/images/tasks/{id}` 直到出图，避免"报失败但已扣费"。实测 `supersolar-image` 约 90 秒出图。
+- **整片模型映射**：上游把"整片"的兜底模型写死成 Atlas 的 `bytedance/seedance-2.5/reference-to-video`，
+  中转站没有这个 id（参考生视频就是 `seedance-2.5` 本身）。改为按 provider 取兜底型号，
+  并在适配器里为 `seedance-2.5` 补 `omni_reference_task_type: "reference"` 与音频开关。
+
 ### 6. 补齐分发合规材料
 
 - `package.json` 的 `build.extraResources` 现在会把 `LICENSE`、`NOTICE`、`THIRD-PARTY-NOTICES.md` 打进安装包（上游的 `build.files` 未包含，属分发缺口）

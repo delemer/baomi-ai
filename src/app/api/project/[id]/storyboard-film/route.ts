@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // the model that will actually be billed — resolved identically on both branches, so the
     // preview names the same model the paid submit uses (issue #28)
-    const choice = resolveFilmModel(model);
+    const choice = resolveFilmModel(model, providerName);
     const fit = filmDurationFit(shots, choice.model);
 
     if (dryRun) {

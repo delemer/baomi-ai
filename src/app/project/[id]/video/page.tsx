@@ -266,7 +266,14 @@ export default function VideoPage() {
 
   // 用设置里的默认分辨率/比例初始化一次
   useEffect(() => {
-    setConfig((c) => ({ ...c, resolution: defaultResolution, aspectRatio: defaultAspectRatio }));
+    setConfig((c) => ({
+      ...c,
+      // 生成档位可能是 480p（省钱档），但**成片渲染只有 720p / 1080p 两档**：
+      // 480p 素材合成到 720p 画布不会损失信息，而多开一个渲染档位只会让 FFmpeg
+      // 编码参数（preset/crf）更难维护，所以这里做一次档位归一。
+      resolution: defaultResolution === "1080p" ? "1080p" : "720p",
+      aspectRatio: defaultAspectRatio,
+    }));
   }, [defaultResolution, defaultAspectRatio]);
 
   // Production-console preview hand-off: select the existing real fast profile
