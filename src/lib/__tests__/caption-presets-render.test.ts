@@ -18,6 +18,7 @@ import { mkdtemp, writeFile, mkdir } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { buildComposeInvocation, type ComposeConfig } from "@/lib/video-composer/composer";
+import { filterScriptArgs } from "@/lib/ffmpeg-path";
 import { captionPresetOverrides } from "@/lib/caption-presets";
 
 const run = promisify(execFile);
@@ -78,12 +79,12 @@ async function renderSubtitle(
   // outputArgs[0..1] are ["-map", "[vN]"]; swap the encode+file tail for a single raw gray frame on stdout
   const { stdout } = await run(
     FF as string,
-    [...inv.inputArgs, "-filter_complex_script", filterFile, inv.outputArgs[0], inv.outputArgs[1], "-frames:v", "1", "-pix_fmt", "gray", "-f", "rawvideo", "-"],
+    [...inv.inputArgs, ...filterScriptArgs(filterFile, inv.filterComplex), inv.outputArgs[0], inv.outputArgs[1], "-frames:v", "1", "-pix_fmt", "gray", "-f", "rawvideo", "-"],
     { encoding: "buffer", maxBuffer: 1e8 },
   );
   if (process.env.CAPTION_PRESET_DUMP && dumpName) {
     await mkdir(process.env.CAPTION_PRESET_DUMP, { recursive: true });
-    await run(FF as string, [...inv.inputArgs, "-filter_complex_script", filterFile, inv.outputArgs[0], inv.outputArgs[1], "-frames:v", "1", "-y", join(process.env.CAPTION_PRESET_DUMP, `${dumpName}.png`)]);
+    await run(FF as string, [...inv.inputArgs, ...filterScriptArgs(filterFile, inv.filterComplex), inv.outputArgs[0], inv.outputArgs[1], "-frames:v", "1", "-y", join(process.env.CAPTION_PRESET_DUMP, `${dumpName}.png`)]);
   }
   let ink = 0; // bright pixels: white caption glyphs
   let dark = 0; // dark pixels: translucent box / black stroke (background Y≈65 counts as neither)

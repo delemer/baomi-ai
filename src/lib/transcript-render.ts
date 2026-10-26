@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from "fs/promises";
 import { dirname, join } from "path";
 import { runTranscriptFfmpeg } from "@/lib/transcript-render-process";
 import { getOutputDir } from "@/lib/paths";
+import { filterScriptArgs } from "@/lib/ffmpeg-path";
 import {
   karaokeLinesFromWords,
   outputDuration,
@@ -151,7 +152,7 @@ export async function renderTranscriptEdit(input: RenderTranscriptEditInput): Pr
     duration,
   });
   await writeFile(filterPath, invocation.filterComplex, "utf8");
-  const args = [...invocation.inputArgs, "-filter_complex_script", filterPath, ...invocation.outputArgs];
+  const args = [...invocation.inputArgs, ...filterScriptArgs(filterPath, invocation.filterComplex), ...invocation.outputArgs];
   try {
     await withComposeSlot(() => {
       input.signal?.throwIfAborted();

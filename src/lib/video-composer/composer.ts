@@ -1,6 +1,6 @@
 import { join, dirname } from "path";
 import { getDataDir } from "@/lib/paths";
-import { ffmpegBin } from "@/lib/ffmpeg-path";
+import { ffmpegBin, filterScriptArgs } from "@/lib/ffmpeg-path";
 import { mkdir, writeFile, rm } from "fs/promises";
 import { existsSync } from "fs";
 import { TRANSITIONS, type TransitionMode } from "./transitions";
@@ -930,7 +930,9 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
 
   const inv = buildComposeInvocation(config);
 
-  // Write the (large, newline-laden) filtergraph to a script file and pass it via -filter_complex_script.
+  // Write the (large, newline-laden) filtergraph to a script file and pass it via the
+  // filter-script option (spelled by filterScriptArgs: `-/filter_complex` on FFmpeg 7+,
+  // `-filter_complex_script` on older builds — the former was removed in 7.0).
   // Combined with execFile (no shell) this is the crux of the Windows fix (issue #13): a real 6-shot compose
   // command is ~12k chars with ~23 embedded newlines, and running it through cmd.exe (as child_process.exec
   // does on Windows) blew past its 8191-char command-line cap and choked on the newlines, so every final
@@ -938,7 +940,7 @@ export async function composeVideo(config: ComposeConfig): Promise<string> {
   // cap, no quoting/backslash issues) and the script file keeps the argv small regardless of project size.
   const filterFile = join(outputDir, `filter_${Date.now()}.txt`);
   await writeFile(filterFile, inv.filterComplex, "utf8");
-  const args = [...inv.inputArgs, "-filter_complex_script", filterFile, ...inv.outputArgs];
+  const args = [...inv.inputArgs, ...filterScriptArgs(filterFile, inv.filterComplex), ...inv.outputArgs];
 
   const { execFile } = await import("child_process");
   const { promisify } = await import("util");
