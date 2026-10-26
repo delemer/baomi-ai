@@ -54,7 +54,16 @@
 `src/lib/atlas-onekey.ts` 中上游默认指向 `atlascloud.ai?ref=JPM683`（原作者返利码）。
 本项目发布的分发版不应把用户导向他人的返利账号，已改为不带参数的普通地址。
 
-### 5. 补齐分发合规材料
+### 5. 设置页拆分为「极简」与「高级」两层
+
+上游只有一个设置页（1427 行、7 个标签、8 个平台卡全部展开、35 个输入框），对"只用中转站"的用户过重。
+
+- **`/settings`（新增）**：极简设置页 —— 只有「连接中转站（一个 Key 输入框）」「出片质量（画质 / 比例 / 花费上限）」「当前使用的 AI（只报用途，不报模型名）」三块；单页滚动、不分标签、不出现"平台"概念。
+- **`/settings/advanced`（原页面迁移至此）**：完整参数页，能力与上游一致，新增「← 返回简单设置」入口。
+- 应用内 9 处 `?tab=` 深链已改指：配置 Key 类 → 极简页；模型 / 平台类 → 高级页。
+- i18n：新增 `simple*` / `advancedTitle` 等词条（中英成对）。
+
+### 6. 补齐分发合规材料
 
 - `package.json` 的 `build.extraResources` 现在会把 `LICENSE`、`NOTICE`、`THIRD-PARTY-NOTICES.md` 打进安装包（上游的 `build.files` 未包含，属分发缺口）
 - 新增 `THIRD-PARTY-NOTICES.md`：FFmpeg/FFprobe 的 GPL-3.0 义务与源码获取路径、字体 OFL、Electron/Chromium、LGPL 组件等

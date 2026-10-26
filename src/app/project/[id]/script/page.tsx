@@ -824,7 +824,7 @@ export default function ScriptPage() {
             <div className="mb-4 flex flex-col items-center gap-2">
               <p className="text-sm text-destructive">{genError}</p>
               {/* most generation errors are LLM-config related — offer a direct jump to Settings */}
-              <Link href="/settings?tab=llm" className="text-xs text-primary underline underline-offset-2 hover:text-primary/80">
+              <Link href="/settings" className="text-xs text-primary underline underline-offset-2 hover:text-primary/80">
                 {t("goToSettings")}
               </Link>
             </div>
@@ -1271,7 +1271,7 @@ export default function ScriptPage() {
               {genError && (
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-2.5 text-xs text-red-400">
                   <span>{genError}</span>
-                  <Link href="/settings?tab=llm" className="shrink-0 text-primary underline underline-offset-2 hover:text-primary/80">
+                  <Link href="/settings" className="shrink-0 text-primary underline underline-offset-2 hover:text-primary/80">
                     {t("goToSettings")}
                   </Link>
                 </div>

@@ -829,7 +829,7 @@ export default function StartPage() {
                 </div>
                 {connectError && <div className="cf-keyerr">{connectError}</div>}
                 <div className="cf-keyalt">
-                  <Link href="/settings?tab=llm">{t("atlasUseOther")}</Link>
+                  <Link href="/settings">{t("atlasUseOther")}</Link>
                 </div>
               </div>
             )}

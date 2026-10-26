@@ -1383,7 +1383,7 @@ export default function AssetsPage() {
               <p className="text-sm font-medium text-amber-200">{t("noModelTitle")}</p>
               <p className="text-xs text-amber-300/80 mt-0.5">
                 {t("noModelDesc")}
-                <Link href="/settings?tab=image" className="underline ml-1">{t("goToSettings")}</Link>
+                <Link href="/settings/advanced?tab=image" className="underline ml-1">{t("goToSettings")}</Link>
               </p>
             </div>
           </div>

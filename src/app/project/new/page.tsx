@@ -655,7 +655,7 @@ export default function NewProjectPage() {
 
         {/* LLM not configured warning */}
         {!isLLMConfigured && (
-          <Link href="/settings?tab=llm">
+          <Link href="/settings">
             <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 cursor-pointer hover:bg-amber-500/15 transition-colors">
               <LuCircleAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
               <div>

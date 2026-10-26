@@ -47,7 +47,7 @@ export function ProductionProfilePicker() {
           </div>
           <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{t("profileDescription")}</p>
         </div>
-        <Link href="/settings?tab=video" className="inline-flex min-h-6 shrink-0 items-center text-[11px] text-primary hover:underline">
+        <Link href="/settings/advanced?tab=video" className="inline-flex min-h-6 shrink-0 items-center text-[11px] text-primary hover:underline">
           {t("profileFineTune")}
         </Link>
       </div>
@@ -107,7 +107,7 @@ export function ProductionProfilePicker() {
 
       {incomplete && (
         <p className="mt-2.5 text-[11px] text-amber-300/90">
-          {t("profileModelWarning")} <Link href="/settings?tab=providers" className="inline-flex min-h-6 items-center font-medium underline underline-offset-2">{t("profileConfigure")}</Link>
+          {t("profileModelWarning")} <Link href="/settings/advanced?tab=providers" className="inline-flex min-h-6 items-center font-medium underline underline-offset-2">{t("profileConfigure")}</Link>
         </p>
       )}
     </section>
