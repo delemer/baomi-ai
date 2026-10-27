@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 1332px;
+    background: #0a0a0f;
+    color: #e8e8f0;
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+    padding: 54px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+  .glow { position:absolute; border-radius:50%; filter: blur(120px); opacity:.22; }
+  .g1 { width:620px; height:620px; background:#7c5cff; top:-220px; right:-120px; }
+  .g2 { width:520px; height:520px; background:#22d3ee; bottom:-200px; left:-160px; }
+
+  header { position: relative; margin-bottom: 34px; }
+  h1 { font-size: 46px; letter-spacing: -1px; font-weight: 800; }
+  h1 .brand { color: #a78bfa; }
+  .sub { margin-top: 10px; font-size: 16px; color: #8a8aa3; }
+  .tags { margin-top: 14px; display: flex; gap: 10px; }
+  .tag { font-size: 13px; padding: 5px 12px; border-radius: 99px; border: 1px solid #2a2a3d; color: #a0a0bd; background: #12121a; }
+
+  .section-title { display:flex; align-items:center; gap:12px; margin: 30px 0 16px; }
+  .section-title .bar { width: 5px; height: 22px; border-radius: 3px; background: linear-gradient(#a78bfa,#6366f1); }
+  .section-title h2 { font-size: 22px; font-weight: 700; }
+  .section-title .note { font-size: 13px; color: #6f6f8a; margin-left: 4px; }
+
+  /* 主流程 */
+  .flow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 14px; }
+  .step {
+    background: linear-gradient(180deg, #14141f, #101017);
+    border: 1px solid #262636;
+    border-radius: 16px;
+    padding: 16px 14px;
+    position: relative;
+  }
+  .step .no {
+    position:absolute; top:-11px; left:14px;
+    width: 24px; height:24px; border-radius: 50%;
+    background: linear-gradient(135deg,#8b5cf6,#6366f1);
+    color:#fff; font-size: 13px; font-weight: 700;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step h3 { font-size: 17px; font-weight: 700; margin: 8px 0 10px; }
+  .step ul { list-style: none; }
+  .step li { font-size: 12.5px; line-height: 1.55; color: #9a9ab5; padding-left: 11px; position: relative; margin-bottom: 5px; }
+  .step li::before { content:""; position:absolute; left:0; top:7px; width:4px; height:4px; border-radius:50%; background:#6d5bd0; }
+
+  /* 双路线 */
+  .routes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .route { border-radius: 16px; padding: 18px 20px; display:flex; gap:16px; align-items:flex-start; }
+  .route.free { background: #0f1a14; border: 1px solid #1f4433; }
+  .route.paid { background: #1a1426; border: 1px solid #3b2b5c; }
+  .ico-badge {
+    width: 46px; height: 46px; border-radius: 12px; flex: 0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 15px; font-weight: 800; letter-spacing: -.5px;
+  }
+  .ico-badge.free { background:#12351f; color:#4ade80; border:1px solid #1f6b3c; }
+  .ico-badge.paid { background:#241a3d; color:#c4b5fd; border:1px solid #4c3a7a; }
+  .route h3 { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .route p { font-size: 13px; color: #9a9ab5; line-height: 1.6; }
+  .route .price { font-weight: 700; }
+  .route.free .price { color: #4ade80; }
+  .route.paid .price { color: #c4b5fd; }
+
+  /* 支撑层 */
+  .layer { display: grid; grid-template-columns: 150px 1fr; gap: 18px; align-items: stretch; margin-bottom: 12px; }
+  .layer .name {
+    background: linear-gradient(180deg,#191926,#12121c);
+    border: 1px solid #2a2a3d; border-radius: 12px;
+    display:flex; align-items:center; justify-content:center;
+    font-size: 14px; font-weight: 700; color: #c9c9e0; text-align:center; padding: 10px;
+  }
+  .layer .items { display: grid; gap: 10px; }
+  .layer .items.c2 { grid-template-columns: 1fr 1fr; }
+  .layer .items.c3 { grid-template-columns: repeat(3, 1fr); }
+  .layer .items.c4 { grid-template-columns: repeat(4, 1fr); }
+  .item {
+    background: #101019; border: 1px solid #232333; border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .item b { display:block; font-size: 13.5px; margin-bottom: 5px; color: #ddddf0; font-weight: 600; }
+  .item span { font-size: 12px; color: #8686a2; line-height: 1.55; display:block; }
+
+  /* 底部 */
+  .bottom { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+  .foot { margin-top: 26px; padding-top: 18px; border-top: 1px solid #1e1e2c; display:flex; justify-content:space-between; align-items:center; }
+  .foot .stack { font-size: 12.5px; color: #6f6f8a; }
+  .foot .license { font-size: 12.5px; color: #6f6f8a; }
+  .accent { color:#a78bfa; }
+</style>
+</head>
+<body>
+  <div class="glow g1"></div>
+  <div class="glow g2"></div>
+
+  <header>
+    <h1>爆米AI <span class="brand">功能框架图</span></h1>
+    <div class="sub">一张商品图 → 会出单的竖屏带货视频 · 基于 ClipForge v0.9.12 的 AGPL-3.0 二次开发版</div>
+    <div class="tags">
+      <div class="tag">本地运行 · 数据不出本机</div>
+      <div class="tag">BYOK · 支持自有中转站</div>
+      <div class="tag">Windows 桌面端</div>
+      <div class="tag">开源免费（AGPL-3.0）</div>
+    </div>
+  </header>
+
+  <!-- 主流程 -->
+  <div class="section-title"><div class="bar"></div><h2>主流程 · 七步出片</h2><span class="note">每一步都可单独重做，不必从头再来</span></div>
+  <div class="flow">
+    <div class="step"><div class="no">1</div><h3>输入</h3>
+      <ul>
+        <li>商品图 ≤5 张</li>
+        <li>商品链接抓取</li>
+        <li>一句话主题</li>
+        <li>自带脚本 / 本地素材</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">2</div><h3>脚本</h3>
+      <ul>
+        <li>5 品类 × 10 风格</li>
+        <li>黄金 3 秒钩子</li>
+        <li>判官团改稿</li>
+        <li>批量 A/B 变体</li>
+        <li>平台 SEO 文案包</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">3</div><h3>画面</h3>
+      <ul>
+        <li>AI 生图（商品保真）</li>
+        <li>图生视频 i2v</li>
+        <li>九宫格分镜</li>
+        <li>一键整片</li>
+        <li>免费素材检索</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">4</div><h3>配音</h3>
+      <ul>
+        <li>付费 TTS 多平台</li>
+        <li>声音克隆</li>
+        <li>多角色 / 情绪化</li>
+        <li>自动对齐时长</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">5</div><h3>字幕</h3>
+      <ul>
+        <li>中文字幕烧录</li>
+        <li>卡拉OK 逐字</li>
+        <li>样式预设</li>
+        <li>安全区避让</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">6</div><h3>合成</h3>
+      <ul>
+        <li>FFmpeg 本地合成</li>
+        <li>转场 / 运镜</li>
+        <li>BGM 自动闪避</li>
+        <li>AIGC 标识写入</li>
+      </ul>
+    </div>
+    <div class="step"><div class="no">7</div><h3>导出</h3>
+      <ul>
+        <li>竖屏成片 1080×1920</li>
+        <li>多平台构图规格</li>
+        <li>封面 / 片尾 / 二维码</li>
+        <li>素材署名清单</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 双路线 -->
+  <div class="section-title"><div class="bar"></div><h2>两条出片路线</h2><span class="note">先跑免费的验证流程，再决定是否花钱</span></div>
+  <div class="routes">
+    <div class="route free">
+      <div class="ico-badge free">¥0</div>
+      <div>
+        <h3>免费快剪</h3>
+        <p>真实素材混剪 + 免费配音 + 本地合成，不需要任何 AI Key。<br>
+        花费 <span class="price">¥0</span> · 耗时约 2 分钟 · 适合批量测选题</p>
+      </div>
+    </div>
+    <div class="route paid">
+      <div class="ico-badge paid">AI</div>
+      <div>
+        <h3>AI 生成成片</h3>
+        <p>AI 生图 + 图生视频 + 配音，商品保真、画面原创。<br>
+        按秒计费 <span class="price">约 ¥12–43 / 条</span> · 出片前预估并确认，单次花费上限保护</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 支撑层 -->
+  <div class="section-title"><div class="bar"></div><h2>支撑层</h2><span class="note">决定"能做什么"的四层能力</span></div>
+
+  <div class="layer">
+    <div class="name">AI 接入层</div>
+    <div class="items c4">
+      <div class="item"><b>Max API 中转站</b><span>一个 Key 覆盖 chat / 识图 / 生图 / 生视频 / 场景App / TTS</span></div>
+      <div class="item"><b>7 个媒体平台</b><span>Atlas · fal · Replicate · 火山 · 百炼 · 硅基 · OpenAI</span></div>
+      <div class="item"><b>任意 OpenAI 兼容</b><span>自填 baseUrl + 自定义模型，模型可自动发现</span></div>
+      <div class="item"><b>本地 Ollama</b><span>完全离线跑开源模型</span></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="name">本地引擎层</div>
+    <div class="items c4">
+      <div class="item"><b>FFmpeg</b><span>合成、转场、字幕烧录、AIGC 元数据（兼容 FFmpeg 7+）</span></div>
+      <div class="item"><b>SQLite + 文件库</b><span>项目 / 素材 / 成片全在本地 data 目录</span></div>
+      <div class="item"><b>Whisper 本地 ASR</b><span>长素材转写、删词删静音剪片</span></div>
+      <div class="item"><b>内置中文字体</b><span>自动规避中文安装路径导致的字体加载失败</span></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="name">扩展接口层</div>
+    <div class="items c3">
+      <div class="item"><b>Windows 桌面端</b><span>Electron 打包，内置 FFmpeg，双击即用</span></div>
+      <div class="item"><b>CLI / HTTP API</b><span>脚本化批量出片、接自有系统</span></div>
+      <div class="item"><b>MCP / Agent Skill</b><span>让 AI Agent 直接调用出片流水线</span></div>
+    </div>
+  </div>
+
+  <div class="layer">
+    <div class="name">合规层</div>
+    <div class="items c4">
+      <div class="item"><b>AIGC 显式标识</b><span>片头「内容由 AI 生成」角标（可关，但会有风险提示）</span></div>
+      <div class="item"><b>AIGC 隐式标识</b><span>写入 GB 45438 三项元数据，服务提供者=爆米AI</span></div>
+      <div class="item"><b>广告法扫描</b><span>绝对化用语、违禁词在发布前拦截</span></div>
+      <div class="item"><b>发布门禁 + 署名</b><span>发布前检查清单；第三方素材生成 credits</span></div>
+    </div>
+  </div>
+
+  <!-- 底部 -->
+  <div class="section-title"><div class="bar"></div><h2>数据与交付</h2></div>
+  <div class="bottom">
+    <div class="item"><b>本地数据目录</b><span>%APPDATA%\BaoMiAI\data —— sqlite.db / uploads / output；卸载前复制整个目录即可备份</span></div>
+    <div class="item"><b>分发形态</b><span>Windows 安装包（NSIS）+ 开源仓库（完整源码，AGPL-3.0，可自行编译）</span></div>
+  </div>
+
+  <div class="foot">
+    <div class="stack">技术栈：Next.js 16 · React 19 · TypeScript · Tailwind 4 · Electron · FFmpeg · SQLite / Drizzle</div>
+    <div class="license">AGPL-3.0-only · 基于 ClipForge © 2026 xixihhhh</div>
+  </div>
+</body>
+</html>
