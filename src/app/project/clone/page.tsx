@@ -53,6 +53,8 @@ export default function ClonePage() {
 
   // video URL and analysis state
   const [videoUrl, setVideoUrl] = useState("");
+  // 视频直链（可直接下载分析）；平台分享页链接不匹配这个正则
+  const DIRECT_VIDEO_RE = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [storyboards, setStoryboards] = useState<StoryboardCard[]>([]);
   // real reference-video analysis (rhythm skeleton + model-tier eligibility)
@@ -135,10 +137,23 @@ export default function ClonePage() {
     setRefAnalysis(null);
     setAnalyzeError("");
     try {
-      if (refVideoFile) {
-        const fd = new FormData();
-        fd.append("file", refVideoFile);
-        const res = await fetch("/api/replicate/analyze", { method: "POST", body: fd });
+      // 本地文件，或「视频直链」（.mp4/.mov/.webm 结尾）都能触发**真实分析**。
+      // 平台分享页（抖音/快手/小红书）是反爬壳页，服务端拿不到播放地址 → 接口会明确报错。
+      if (refVideoFile || DIRECT_VIDEO_RE.test(videoUrl.trim())) {
+        const res = refVideoFile
+          ? await fetch("/api/replicate/analyze", {
+              method: "POST",
+              body: (() => {
+                const fd = new FormData();
+                fd.append("file", refVideoFile);
+                return fd;
+              })(),
+            })
+          : await fetch("/api/replicate/analyze", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: videoUrl.trim() }),
+            });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.error || t("analyzeFailed"));
         setRefAnalysis(data as RefAnalysis);
@@ -500,6 +515,11 @@ export default function ClonePage() {
                 <p className="text-xs text-muted-foreground">
                   {t("videoUrlHint")}
                 </p>
+                {videoUrl.trim() && !refVideoFile && !DIRECT_VIDEO_RE.test(videoUrl.trim()) && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-600 dark:text-amber-400">
+                    {t("videoUrlNotParseable")}
+                  </p>
+                )}
               </div>
               {analyzeError && <p className="text-xs text-destructive">{analyzeError}</p>}
 
@@ -510,9 +530,20 @@ export default function ClonePage() {
                     <h3 className="text-sm font-medium text-foreground">
                       {refAnalysis ? t("realStructureTitle") : t("structureTitle")}
                     </h3>
-                    <Badge variant="secondary" className="text-xs">
-                      {t("storyboardCount", { n: storyboards.length })}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        className={
+                          refAnalysis
+                            ? "bg-emerald-500/15 text-xs text-emerald-500"
+                            : "bg-amber-500/15 text-xs text-amber-500"
+                        }
+                      >
+                        {refAnalysis ? t("badgeParsed") : t("badgeGeneric")}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {t("storyboardCount", { n: storyboards.length })}
+                      </Badge>
+                    </div>
                   </div>
                   <p className="text-xs text-muted-foreground -mt-1">
                     {refAnalysis
