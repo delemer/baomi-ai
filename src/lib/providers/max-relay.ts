@@ -492,6 +492,21 @@ export class MaxRelayProvider extends BaseProvider {
       await pushAsset(ref, `image_${imageIndex++}`)
     }
 
+    // 多参生视频还支持 **视频/音频参考槽位**（≤3 视频、≤3 音频）。旧实现只推了图，
+    // 而「一键成片复刻」的提示词明确写着「参考 视频1 的运镜节奏」——素材缺失会让场景 App 的
+    // 提示词优化阶段直接失败（实测任务终态 error.code=optimization_failed，
+    // 报「视频处理未完成，原始输入已保留」，前端只看到 504）。
+    if (kind === 'multiRef') {
+      let videoIndex = 1
+      for (const ref of (options.referenceVideoUrls ?? []).slice(0, 3)) {
+        await pushAsset(ref, `video_${videoIndex++}`)
+      }
+      let audioIndex = 1
+      for (const ref of (options.referenceAudioUrls ?? []).slice(0, 3)) {
+        await pushAsset(ref, `audio_${audioIndex++}`)
+      }
+    }
+
     // 比例枚举分两种：文戏/武戏是带括号标签的整串，commerce / 多参是纯 `9:16`。
     const plainRatio = ratio === 'adaptive' ? '9:16' : ratio
     const dramaRatio = DRAMA_RATIO[ratio] ?? DRAMA_RATIO['9:16']

@@ -103,16 +103,40 @@ export function replicateReferenceStructure(shots: ReplicateShot[], totalDuratio
   ].join("\n");
 }
 
+/** 该型号是否走 MAX 场景 App（提示词引用语法不同：`@视频1` / `@图片1`）。 */
+export function isMaxAppReferenceModel(modelId: string | undefined): boolean {
+  return !!modelId && MAX_REFERENCE_MODELS.has(modelId.trim());
+}
+
 /**
- * Prompt for the model-tier one-shot replication (Seedance reference-to-video):
- * ordinal references per the official syntax — video 1 = the reference clip,
- * image 1..N = product photos. Product fidelity wording mirrors PRODUCT_CONSTRAINT.
+ * Prompt for the model-tier one-shot replication.
+ *
+ * 两种引用方言，用错素材就绑不上（实测：多参生视频写"视频1/图1"会走到
+ * 「应用执行结束，但没有生成视频结果」，因为 MAX 场景 App 只认固定 `@视频N`/`@图片N`）：
+ *  - Atlas / Seedance 官方语法：`video 1`、`image 1..N`
+ *  - MAX 场景 App（多参生视频等）：`@视频1`、`@图片1~@图片N`
+ * Product fidelity wording mirrors PRODUCT_CONSTRAINT.
  */
-export function buildReplicatePrompt(input: { productName: string; sellingPoints?: string; imageCount: number }): string {
+export function buildReplicatePrompt(input: {
+  productName: string;
+  sellingPoints?: string;
+  imageCount: number;
+  /** "max-app" → @图片N 语法；缺省为 Atlas 的 ordinal 语法 */
+  dialect?: "ordinal" | "max-app";
+}): string {
+  const maxApp = input.dialect === "max-app";
+  const videoRef = maxApp ? "@视频1" : "视频1";
+  const imageRef = maxApp
+    ? input.imageCount > 1
+      ? `@图片1~@图片${input.imageCount}`
+      : "@图片1"
+    : input.imageCount > 1
+      ? `图1~图${input.imageCount}`
+      : "图1";
   const parts = [
-    `参考 视频1 的运镜、节奏、景别与转场，复刻一条同样风格的带货短视频`,
+    `参考 ${videoRef} 的运镜、节奏、景别与转场，复刻一条同样风格的带货短视频`,
     input.imageCount > 0
-      ? `把画面中的商品替换为 图1${input.imageCount > 1 ? `~图${input.imageCount}` : ""} 中的「${input.productName}」，商品的外观、包装、颜色、logo 与文字必须与参考图完全一致，不得扭曲变形`
+      ? `把画面中的商品替换为 ${imageRef} 中的「${input.productName}」，商品的外观、包装、颜色、logo 与文字必须与参考图完全一致，不得扭曲变形`
       : `商品为「${input.productName}」`,
   ];
   const points = input.sellingPoints?.trim();

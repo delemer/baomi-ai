@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { mergeCustomModels, buildVideoOptions } from "@/lib/gen-params";
-import { referenceModelFor, referenceMaxRefSeconds, buildReplicatePrompt, REPLICATE_MAX_REF_SEC, type ReplicateShot } from "@/lib/replicate-plan";
+import { referenceModelFor, referenceMaxRefSeconds, isMaxAppReferenceModel, buildReplicatePrompt, REPLICATE_MAX_REF_SEC, type ReplicateShot } from "@/lib/replicate-plan";
 import { useDraftField } from "@/lib/stores/clone-draft-store";
 import { useT } from "@/lib/i18n";
 
@@ -265,7 +265,7 @@ export default function ClonePage() {
           apiKey: videoModelTarget.apiKey,
           baseUrl: videoModelTarget.baseUrl,
           mode: "video-to-video",
-          prompt: buildReplicatePrompt({ productName, sellingPoints: productFeatures, imageCount: paths.length }),
+          prompt: buildReplicatePrompt({ productName, sellingPoints: productFeatures, imageCount: paths.length, dialect: isMaxAppReferenceModel(refModel) ? "max-app" : "ordinal" }),
           referenceVideoUrls: [refAnalysis.path],
           referenceImageUrls: paths,
           projectId,
