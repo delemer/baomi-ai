@@ -18,6 +18,7 @@ import {
   estimateFilmSpend,
   parseUnitUsd,
   FILM_MAX_SECONDS,
+  MAX_RELAY_FILM_MODEL,
 } from "@/lib/storyboard-film";
 import { fetchAtlasCatalog, getCachedAtlasEntry } from "@/lib/providers/atlas-catalog";
 import { ATLAS_BASE_URL } from "@/lib/atlas-onekey";
@@ -104,7 +105,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // the model that will actually be billed — resolved identically on both branches, so the
     // preview names the same model the paid submit uses (issue #28)
-    const choice = resolveFilmModel(model, providerName);
+    const resolved = resolveFilmModel(model, providerName);
+    // 防御：中转站没有 `<family>/<mode>` 这种 Atlas 命名，收到 `bytedance/.../reference-to-video`
+    // 会直接 503 model_not_found（实测 No available channel for model ...）。客户端若因为旧预览
+    // 缓存/少传 provider 带上了这类 id，这里就地换成中转站自己的参考生视频型号。
+    const choice =
+      providerName === "max-relay" && resolved.model.includes("/")
+        ? { model: MAX_RELAY_FILM_MODEL, swappedFrom: resolved.swappedFrom ?? resolved.model }
+        : resolved;
     const fit = filmDurationFit(shots, choice.model);
 
     if (dryRun) {

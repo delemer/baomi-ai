@@ -891,7 +891,13 @@ export default function AssetsPage() {
       const res = await fetch(`/api/project/${id}/storyboard-film`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scriptId, dryRun: true, model: videoModelTarget.model, baseUrl: videoModelTarget.baseUrl }),
+        body: JSON.stringify({
+          scriptId,
+          dryRun: true,
+          provider: videoModelTarget.provider,
+          model: videoModelTarget.model,
+          baseUrl: videoModelTarget.baseUrl,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || t("filmFailed"));
@@ -915,7 +921,9 @@ export default function AssetsPage() {
           scriptId,
           provider: videoModelTarget.provider,
           // whatever the confirm card just priced — never re-derived, so what was shown is what bills
-          model: resolveFilmModel(videoModelTarget.model).model,
+          // 必须带上 provider：中转站的参考生视频型号是 `seedance-2.5` 本身，不传 provider 会兜底成
+          // Atlas 的 `bytedance/seedance-2.5/reference-to-video`，中转站直接 503 model_not_found。
+          model: resolveFilmModel(videoModelTarget.model, videoModelTarget.provider).model,
           spendCapUsd,
           acknowledgeOverCap: true, // the card already required an explicit confirm on this estimate
           apiKey: videoModelTarget.apiKey,

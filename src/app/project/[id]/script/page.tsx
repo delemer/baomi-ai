@@ -578,6 +578,15 @@ export default function ScriptPage() {
     const resolution = spec?.resolution ?? filmResolution;
     const aspectRatio = spec?.aspectRatio ?? filmAspectRatio;
     const presenter = presenterLib.find((c) => c.id === presenterParam);
+    // provider 必须一起传：route 用它决定"整片兜底型号"（中转站 = seedance-2.5，Atlas = .../reference-to-video）。
+    // 漏传会让预览卡片显示 Atlas 的型号名，付费提交也照那个名字发 → 中转站 503 model_not_found。
+    const filmSettings = useSettingsStore.getState();
+    const filmTarget = await resolveDefaultModelTarget(
+      filmSettings.providers,
+      filmSettings.defaultVideoModel,
+      filmSettings.customModels,
+      "video"
+    );
     const res = await fetch(`/api/project/${id}/storyboard-film`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -585,7 +594,8 @@ export default function ScriptPage() {
         dryRun: true,
         // preview the CONFIGURED model: the route resolves it the same way the paid submit does,
         // so a forced switch shows up in the confirm card instead of only on the invoice (issue #28)
-        model: useSettingsStore.getState().defaultVideoModel,
+        model: filmSettings.defaultVideoModel,
+        ...(filmTarget?.provider && { provider: filmTarget.provider }),
         // 画质/比例在这里生效：dryRun 用同一份 options 估算价位档，付费提交也用同一份
         options: filmSizeOptions(resolution, aspectRatio),
         // a picked presenter WILL ride as a reference sheet (generated on demand later), so the
