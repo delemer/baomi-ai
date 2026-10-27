@@ -4,6 +4,7 @@ import {
   replicateReferenceStructure,
   buildReplicatePrompt,
   referenceModelFor,
+  referenceMaxRefSeconds,
   REPLICATE_MAX_REF_SEC,
 } from "@/lib/replicate-plan";
 
@@ -85,6 +86,20 @@ describe("referenceModelFor 模型映射", () => {
     expect(referenceModelFor("alibaba/wan-2.7/image-to-video")).toBe("alibaba/wan-2.7/reference-to-video");
     expect(referenceModelFor("kwaivgi/kling-video-o3-std/text-to-video")).toBe("kwaivgi/kling-video-o3-std/reference-to-video");
     expect(referenceModelFor("minimax/h3/reference-to-video")).toBe("minimax/h3/reference-to-video");
+  });
+
+  it("中转站型号本身就是参考模型（无需换 sibling id）", () => {
+    // 旧逻辑只认 Atlas 的 <family>/<mode> 命名，把这些型号判成"不支持"，⚡ 按钮永远置灰
+    expect(referenceModelFor("supersolar-multi-reference-v2-app")).toBe("supersolar-multi-reference-v2-app");
+    expect(referenceModelFor("seedance-2.5")).toBe("seedance-2.5");
+    expect(referenceModelFor("supersolar-literary-drama-app")).toBe("supersolar-literary-drama-app");
+  });
+
+  it("参考时长上限按型号算：多参生视频 60s，其余沿用 Seedance 系 15s", () => {
+    expect(referenceMaxRefSeconds("supersolar-multi-reference-v2-app")).toBe(60);
+    expect(referenceMaxRefSeconds("seedance-2.5")).toBe(REPLICATE_MAX_REF_SEC);
+    expect(referenceMaxRefSeconds("bytedance/seedance-2.0/reference-to-video")).toBe(REPLICATE_MAX_REF_SEC);
+    expect(referenceMaxRefSeconds(undefined)).toBe(REPLICATE_MAX_REF_SEC);
   });
 
   it("无 reference 变体的家族 → undefined（UI 据此禁用按钮）", () => {

@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useSettingsStore } from "@/lib/stores/settings-store";
 import { mergeCustomModels, buildVideoOptions } from "@/lib/gen-params";
-import { referenceModelFor, buildReplicatePrompt, REPLICATE_MAX_REF_SEC, type ReplicateShot } from "@/lib/replicate-plan";
+import { referenceModelFor, referenceMaxRefSeconds, buildReplicatePrompt, REPLICATE_MAX_REF_SEC, type ReplicateShot } from "@/lib/replicate-plan";
+import { useDraftField } from "@/lib/stores/clone-draft-store";
 import { useT } from "@/lib/i18n";
 
 /** storyboard card data */
@@ -52,21 +53,32 @@ export default function ClonePage() {
   const { llm, providers, defaultVideoModel, customModels, videoParams } = useSettingsStore();
 
   // video URL and analysis state
-  const [videoUrl, setVideoUrl] = useState("");
   // 视频直链（可直接下载分析）；平台分享页链接不匹配这个正则
   const DIRECT_VIDEO_RE = /\.(mp4|webm|mov|m4v)(\?|#|$)/i;
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [storyboards, setStoryboards] = useState<StoryboardCard[]>([]);
-  // real reference-video analysis (rhythm skeleton + model-tier eligibility)
-  const [refVideoFile, setRefVideoFile] = useState<File | null>(null);
-  const [refAnalysis, setRefAnalysis] = useState<RefAnalysis | null>(null);
   const [analyzeError, setAnalyzeError] = useState("");
   const refVideoInputRef = useRef<HTMLInputElement>(null);
 
+  // 填写内容全部走草稿缓存（模块级 zustand 内存）：工作台切板块是真实路由跳转，
+  // 组件会卸载；放在 useState 里会导致回来时参考视频、结构卡、商品图、商品名全被清空。
+  const [videoUrl, setVideoUrl] = useDraftField("videoUrl");
+  const [storyboardsRaw, setStoryboardsRaw] = useDraftField("storyboards");
+  // real reference-video analysis (rhythm skeleton + model-tier eligibility)
+  const [refVideoFileRaw, setRefVideoFileRaw] = useDraftField("refVideoFile");
+  const [refAnalysisRaw, setRefAnalysisRaw] = useDraftField("refAnalysis");
+  const storyboards = storyboardsRaw as StoryboardCard[];
+  const setStoryboards = setStoryboardsRaw as React.Dispatch<React.SetStateAction<StoryboardCard[]>>;
+  const refVideoFile = refVideoFileRaw as File | null;
+  const setRefVideoFile = setRefVideoFileRaw as (v: File | null) => void;
+  const refAnalysis = refAnalysisRaw as unknown as RefAnalysis | null;
+  const setRefAnalysis = setRefAnalysisRaw as (v: RefAnalysis | null) => void;
+
   // product information
-  const [productImages, setProductImages] = useState<ProductImage[]>([]);
-  const [productName, setProductName] = useState("");
-  const [productFeatures, setProductFeatures] = useState("");
+  const [productImagesRaw, setProductImagesRaw] = useDraftField("productImages");
+  const productImages = productImagesRaw as ProductImage[];
+  const setProductImages = setProductImagesRaw as React.Dispatch<React.SetStateAction<ProductImage[]>>;
+  const [productName, setProductName] = useDraftField("productName");
+  const [productFeatures, setProductFeatures] = useDraftField("productFeatures");
 
   // generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -76,7 +88,9 @@ export default function ClonePage() {
   const [videoModelTarget, setVideoModelTarget] = useState<VideoModelTarget | null>(null);
   const [isReplicating, setIsReplicating] = useState(false);
   const [replicateError, setReplicateError] = useState("");
-  const [replicateResult, setReplicateResult] = useState<{ url: string; projectId: string } | null>(null);
+  const [replicateResultRaw, setReplicateResultRaw] = useDraftField("replicateResult");
+  const replicateResult = replicateResultRaw as { url: string; projectId: string } | null;
+  const setReplicateResult = setReplicateResultRaw as (v: { url: string; projectId: string } | null) => void;
 
   // drag-and-drop upload state
   const [isDragging, setIsDragging] = useState(false);
@@ -89,6 +103,12 @@ export default function ClonePage() {
     const word = new URLSearchParams(window.location.search).get("trend")?.trim();
     if (word) setTrendFrom(word.slice(0, 60));
   }, []);
+
+  // 模型级复刻的可用性：不同参考模型的参考时长上限不同（多参生视频 60s，Seedance 系 15s），
+  // 所以「参考视频是否过长」必须按型号算，不能用固定 15 秒（否则选了多参模型也提示超长）。
+  const refModel = referenceModelFor(videoModelTarget?.model);
+  const refMaxSec = refModel ? referenceMaxRefSeconds(refModel) : REPLICATE_MAX_REF_SEC;
+  const modelTierReady = Boolean(refAnalysis) && Boolean(refModel) && refAnalysis!.duration <= refMaxSec;
 
   // resolve the provider for the default video model (drives the model-tier replicate button)
   useEffect(() => {
@@ -225,7 +245,6 @@ export default function ClonePage() {
    */
   const handleModelReplicate = useCallback(async () => {
     if (isReplicating || !refAnalysis || !videoModelTarget) return;
-    const refModel = referenceModelFor(videoModelTarget.model);
     if (!refModel) {
       setReplicateError(t("modelTierNeedSeedance"));
       return;
@@ -236,7 +255,7 @@ export default function ClonePage() {
     try {
       const { projectId, paths } = await createCloneProject();
       const videoOptions = buildVideoOptions(videoParams);
-      videoOptions.duration = Math.min(15, Math.max(4, Math.round(refAnalysis.duration)));
+      videoOptions.duration = Math.min(refMaxSec, Math.max(4, Math.round(refAnalysis.duration)));
       const res = await fetch("/api/ai/video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -768,14 +787,14 @@ export default function ClonePage() {
               <CardContent className="p-6 space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">⚡ {t("modelTierTitle")}</h3>
-                  {!refAnalysis.modelTierEligible && (
+                  {!modelTierReady && (
                     <Badge variant="outline" className="text-xs text-amber-600">
-                      {t("modelTierTooLong", { max: REPLICATE_MAX_REF_SEC })}
+                      {t("modelTierTooLong", { max: refMaxSec })}
                     </Badge>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground leading-relaxed">{t("modelTierDesc")}</p>
-                {videoModelTarget && !referenceModelFor(videoModelTarget.model) && (
+                {videoModelTarget && !refModel && (
                   <p className="text-xs text-amber-600/90">{t("modelTierNeedSeedance")}</p>
                 )}
                 {!videoModelTarget && <p className="text-xs text-amber-600/90">{t("modelTierNeedModel")}</p>}
@@ -797,16 +816,16 @@ export default function ClonePage() {
                     className="text-xs border-primary/50 text-primary hover:bg-primary/10"
                     disabled={
                       isReplicating ||
-                      !refAnalysis.modelTierEligible ||
+                      !modelTierReady ||
                       !videoModelTarget ||
-                      !referenceModelFor(videoModelTarget.model) ||
+                      !refModel ||
                       productImages.length === 0 ||
                       !productName.trim()
                     }
                     onClick={handleModelReplicate}
                     title={
                       videoModelTarget
-                        ? `${videoModelTarget.provider} · ${referenceModelFor(videoModelTarget.model) ?? videoModelTarget.model}`
+                        ? `${videoModelTarget.provider} · ${refModel ?? videoModelTarget.model}`
                         : undefined
                     }
                   >

@@ -130,11 +130,34 @@ export function buildReplicatePrompt(input: { productName: string; sellingPoints
 const REFERENCE_FAMILY_PATTERN =
   /^(bytedance\/seedance-2\.0(?:-fast|-mini)?|minimax\/h3|alibaba\/wan-2\.7|kwaivgi\/kling-video-o3-(?:std|pro))\//;
 
+/**
+ * Max API 中转站里**本身就是参考生视频**的型号 —— 它们没有 `.../reference-to-video` 这类
+ * sibling id，模型 id 自己就能吃参考素材。旧逻辑只认 Atlas 的 `<family>/<mode>` 命名，
+ * 于是把这些型号全判成"不支持参考生视频"，按钮永远置灰（用户明明选的是参考模型）。
+ */
+const MAX_REFERENCE_MODELS = new Set([
+  // 多参生视频：参考图 ≤9 / 参考视频 ≤3 / 参考音频 ≤3，成片上限 60s
+  "supersolar-multi-reference-v2-app",
+  // seedance-2.5：用 omni_reference_task_type=reference 声明参考模式
+  "seedance-2.5",
+  // 文戏（generation_mode=0 即"参考图/纯文生"模式）
+  "supersolar-literary-drama-app",
+]);
+
+/** 每个型号允许的最长参考视频时长；不是所有参考模型都只有 15 秒。 */
+export function referenceMaxRefSeconds(modelId: string | undefined): number {
+  if (modelId === "supersolar-multi-reference-v2-app") return 60;
+  return REPLICATE_MAX_REF_SEC;
+}
+
 export function referenceModelFor(modelId: string | undefined): string | undefined {
   if (!modelId) return undefined;
-  const family = modelId.match(REFERENCE_FAMILY_PATTERN)?.[1];
+  const id = modelId.trim();
+  // 中转站型号：自己就是参考型号，不换 id
+  if (MAX_REFERENCE_MODELS.has(id)) return id;
+  const family = id.match(REFERENCE_FAMILY_PATTERN)?.[1];
   if (!family) return undefined;
-  if (modelId === `${family}/reference-to-video`) return modelId;
-  if (/\/(?:text|image)-to-video$/.test(modelId)) return `${family}/reference-to-video`;
+  if (id === `${family}/reference-to-video`) return id;
+  if (/\/(?:text|image)-to-video$/.test(id)) return `${family}/reference-to-video`;
   return undefined;
 }
