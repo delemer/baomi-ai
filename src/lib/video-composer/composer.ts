@@ -1,4 +1,7 @@
-import { join, dirname } from "path";
+import { join, dirname, isAbsolute, resolve, extname } from "path";
+import { tmpdir } from "os";
+import { createHash } from "crypto";
+import { mkdirSync, copyFileSync } from "fs";
 import { getDataDir } from "@/lib/paths";
 import { ffmpegBin, filterScriptArgs } from "@/lib/ffmpeg-path";
 import { mkdir, writeFile, rm } from "fs/promises";
@@ -10,6 +13,43 @@ import { createLimiter, type Limiter } from "@/lib/concurrency";
 import { buildAigcMetadataArgs, buildAigcMetadataArgv } from "@/lib/compliance-metadata";
 import { CAPTION_SAFE_BOTTOM_RATIO, CAPTION_SAFE_BOTTOM_RATIO_NOCARD } from "./safe-zone";
 import { VOICE_GROUND_CHAIN, roomToneSource } from "./voice-ground";
+
+/**
+ * FFmpeg's font handling on Windows cannot open a font whose **path** contains non-ASCII
+ * characters (freetype is handed an ANSI path and silently falls back to a default font).
+ * The symptom is not an error but tofu: every CJK glyph renders as a box (□□□) — including the
+ * AIGC corner badge — so a project living in e.g. `D:\带货视频\` produces unreadable subtitles.
+ * Packaged installs are just as exposed: the app directory follows the product name.
+ *
+ * Fix: when the resolved path is not pure ASCII, copy the font once into an ASCII-only
+ * directory (temp first, then the ASCII userData we control) and point FFmpeg at that copy.
+ */
+const ASCII_PATH_RE = /^[\x20-\x7E]*$/;
+
+export function asciiSafePath(src: string): string {
+  const abs = isAbsolute(src) ? src : resolve(src);
+  if (ASCII_PATH_RE.test(abs)) return abs;
+  const key = createHash("sha1").update(abs).digest("hex").slice(0, 12);
+  const ext = extname(abs) || ".otf";
+  const roots = [
+    tmpdir(),
+    process.env.APPDATA ? join(process.env.APPDATA, "BaoMiAI") : "",
+    join(process.env.SystemDrive || "C:", "ProgramData", "BaoMiAI"),
+  ].filter(Boolean);
+  for (const root of roots) {
+    const dir = join(root, "ffmpeg-assets");
+    if (!ASCII_PATH_RE.test(dir)) continue; // user profile itself may be non-ASCII
+    try {
+      mkdirSync(dir, { recursive: true });
+      const target = join(dir, `subtitle-${key}${ext}`);
+      if (!existsSync(target)) copyFileSync(abs, target);
+      return target;
+    } catch {
+      /* try the next root */
+    }
+  }
+  return abs; // last resort: tofu beats a hard failure
+}
 
 /**
  * Detect an available Chinese font file path.
@@ -31,7 +71,9 @@ export function resolveChineseFontFile(): string | undefined {
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
   ];
-  return candidates.find((p) => existsSync(p));
+  const found = candidates.find((p) => existsSync(p));
+  // macOS/Linux fonts already live at ASCII paths; only the Windows dev/install layout needs the copy
+  return found ? asciiSafePath(found) : undefined;
 }
 
 /**
@@ -654,7 +696,7 @@ function assembleComposeGraph(config: ComposeConfig): ComposeGraph {
     const fontFile = config.subtitle.fontFile ?? resolveChineseFontFile();
     // fontsdir points to the directory containing the Chinese font so that libass can locate it on Linux (no CoreText)
     const fontsdirArg = fontFile ? `:fontsdir=${escapeSubtitlesPath(dirname(fontFile))}` : "";
-    filterParts.push(`[${currentVideoStream}]subtitles=${escapeSubtitlesPath(config.subtitle.karaokeAssPath)}${fontsdirArg}[${subtitleStream}]`);
+    filterParts.push(`[${currentVideoStream}]subtitles=${escapeSubtitlesPath(asciiSafePath(config.subtitle.karaokeAssPath))}${fontsdirArg}[${subtitleStream}]`);
     currentVideoStream = subtitleStream;
   } else if (config.subtitle?.texts.length) {
     const subtitleStream = `sub_out`;
