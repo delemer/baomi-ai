@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 1345px;
+    background: #0a0a0f; color: #e8e8f0;
+    font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", system-ui, sans-serif;
+    padding: 48px 56px; position: relative; overflow: hidden;
+  }
+  .glow { position:absolute; border-radius:50%; filter: blur(130px); opacity:.2; }
+  .g1 { width:620px; height:620px; background:#7c5cff; top:-240px; right:-140px; }
+  .g2 { width:520px; height:520px; background:#f472b6; bottom:-220px; left:-160px; }
+
+  header { position: relative; margin-bottom: 26px; }
+  h1 { font-size: 40px; font-weight: 800; letter-spacing: -1px; }
+  h1 .accent { color:#a78bfa; }
+  .sub { margin-top: 8px; font-size: 15px; color: #8a8aa3; }
+
+  .zone-label { display:flex; align-items:center; gap:10px; margin: 22px 0 12px; }
+  .zone-label .no {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+    background: linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff;
+    font-size: 14px; font-weight: 700; display:flex; align-items:center; justify-content:center;
+  }
+  .zone-label h2 { font-size: 19px; font-weight: 700; }
+  .zone-label .hint { font-size: 12.5px; color:#6f6f8a; margin-left: 4px; }
+
+  .card { background: linear-gradient(180deg,#14141f,#101017); border:1px solid #262636; border-radius:14px; padding:16px 18px; }
+  .row { display:grid; gap:14px; }
+  .row.c3 { grid-template-columns: repeat(3, 1fr); }
+  .row.c2 { grid-template-columns: 1fr 1fr; }
+
+  .path { border-radius:14px; padding:15px 16px; }
+  .path.ok { background:#0f1a14; border:1px solid #1f4433; }
+  .path.warn { background:#1c1710; border:1px solid #5a4520; }
+  .path h3 { font-size:15px; font-weight:700; margin-bottom:7px; display:flex; align-items:center; gap:8px; }
+  .path .tag { font-size:11px; font-weight:700; padding:2px 7px; border-radius:99px; }
+  .tag.ok { background:#12351f; color:#4ade80; border:1px solid #1f6b3c; }
+  .tag.warn { background:#3a2c10; color:#fbbf24; border:1px solid #6b501c; }
+  .path p { font-size:12.5px; line-height:1.6; color:#9a9ab5; }
+  .path .io { font-size:11.5px; color:#7a7a96; margin-top:6px; font-family: Consolas, monospace; }
+
+  .action-bar {
+    margin: 14px 0 6px; display:flex; align-items:center; justify-content:center; gap:14px;
+  }
+  .action-btn {
+    background: linear-gradient(135deg,#8b5cf6,#6366f1); color:#fff; font-size:13.5px; font-weight:700;
+    padding:10px 22px; border-radius:10px;
+  }
+  .action-note { font-size:12px; color:#7a7a96; }
+
+  .arrow { text-align:center; color:#4b4b63; font-size:18px; line-height:1; margin: 8px 0; }
+
+  .result { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+  .res-card { border-radius:14px; padding:15px 17px; }
+  .res-card.real { background:#0e1a14; border:1px solid #1f4a37; }
+  .res-card.generic { background:#1b1710; border:1px solid #55431f; }
+  .res-card .head { display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
+  .res-card h3 { font-size:15px; font-weight:700; }
+  .res-card .badge { font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; }
+  .badge.green { background:#12351f; color:#4ade80; border:1px solid #1f6b3c; }
+  .badge.amber { background:#3a2c10; color:#fbbf24; border:1px solid #6b501c; }
+  .res-card p { font-size:12.5px; line-height:1.62; color:#9a9ab5; }
+  .shot-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+  .chip { font-size:11px; padding:3px 8px; border-radius:6px; background:#171724; border:1px solid #2b2b3d; color:#a9a9c4; }
+
+  .dep { font-size:12px; color:#6f6f8a; margin-top:10px; }
+
+  /* 分岔 */
+  .branch-wrap { display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top: 6px; }
+  .branch { border-radius:16px; padding:18px 20px; position:relative; }
+  .branch.a { background:linear-gradient(180deg,#181228,#11101a); border:1px solid #3d2f63; }
+  .branch.b { background:linear-gradient(180deg,#1d1410,#141013); border:1px solid #5c3a1e; }
+  .branch .for { font-size:11.5px; font-weight:700; letter-spacing:.4px; padding:3px 9px; border-radius:99px; display:inline-block; margin-bottom:10px; }
+  .branch.a .for { background:#2a1f47; color:#c4b5fd; border:1px solid #4c3a7a; }
+  .branch.b .for { background:#3a2410; color:#fdba74; border:1px solid #7c4a1d; }
+  .branch h3 { font-size:18px; font-weight:800; margin-bottom:8px; }
+  .branch .chain { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+  .step-line { display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:#a6a6c2; line-height:1.55; }
+  .step-line .dot { width:6px; height:6px; border-radius:50%; margin-top:6px; flex:0 0 auto; }
+  .branch.a .dot { background:#a78bfa; }
+  .branch.b .dot { background:#fdba74; }
+  .code { font-family: Consolas, monospace; font-size:11.5px; color:#8f8fb0; background:#0d0d15; border:1px solid #23232f; border-radius:6px; padding:2px 6px; display:inline-block; }
+  .dest { margin-top:12px; font-size:12.5px; padding:9px 12px; border-radius:9px; }
+  .branch.a .dest { background:#1d1633; border:1px solid #3b2d61; color:#c9bcf5; }
+  .branch.b .dest { background:#241812; border:1px solid #5a3418; color:#f7c79a; }
+
+  .guard { margin-top: 18px; display:grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .guard .item { background:#141019; border:1px solid #33243d; border-radius:11px; padding:11px 13px; }
+  .guard b { display:block; font-size:12.5px; color:#e6c2f0; margin-bottom:4px; }
+  .guard span { font-size:11.5px; color:#8b8ba6; line-height:1.5; display:block; }
+
+  .foot { margin-top:22px; padding-top:14px; border-top:1px solid #1e1e2c; display:flex; justify-content:space-between; font-size:12px; color:#6f6f8a; }
+</style>
+</head>
+<body>
+  <div class="glow g1"></div><div class="glow g2"></div>
+
+  <header>
+    <h1>爆款复刻 <span class="accent">操作交互链路</span></h1>
+    <div class="sub">工作台 → 爆款复刻：输入一条爆款参考 → 得到结构骨架 → 分两条路产出成片</div>
+  </header>
+
+  <!-- 1 输入 -->
+  <div class="zone-label"><div class="no">1</div><h2>输入爆款视频</h2><span class="hint">三种输入，决定拿到的是「真实解析」还是「通用模板」</span></div>
+  <div class="row c3">
+    <div class="path ok">
+      <h3>上传视频文件 <span class="tag ok">真实解析</span></h3>
+      <p>mp4 / webm / mov，≤80MB。<br>服务端用 ffmpeg 检测场景切点，得到真实镜头数 + 每镜时长。</p>
+      <div class="io">POST /api/replicate/analyze (file)</div>
+    </div>
+    <div class="path ok">
+      <h3>粘贴视频直链 <span class="tag ok">真实解析</span></h3>
+      <p>以 <b>.mp4 / .mov / .webm</b> 结尾的直链。<br>服务端下载（SSRF 防护、≤80MB）后走同一套分析。</p>
+      <div class="io">POST /api/replicate/analyze (url)</div>
+    </div>
+    <div class="path warn">
+      <h3>粘贴分享链接 <span class="tag warn">不解析</span></h3>
+      <p>抖音 / 快手 / 小红书分享页是反爬壳页，取不到播放地址。<br>只记为"参考来源"，按钮返回固定 6 段通用结构。</p>
+      <div class="io">仅延迟 600ms 返回模板</div>
+    </div>
+  </div>
+
+  <div class="action-bar">
+    <div class="action-btn">载入结构参考</div>
+    <div class="action-note">上传文件或直链 → 真实解析；分享链接 → 通用模板</div>
+  </div>
+  <div class="arrow">↓</div>
+
+  <!-- 2 结构结果 -->
+  <div class="zone-label"><div class="no">2</div><h2>结构卡（决定后续两条路线是否可用）</h2><span class="hint">卡片右上角徽标直接标明来源</span></div>
+  <div class="result">
+    <div class="res-card real">
+      <div class="head"><h3>参考视频真实镜头结构</h3><span class="badge green">真实解析</span></div>
+      <p>按画面切点得到节奏骨架（全长约 Xs）：逐镜对齐镜头数与时长，<b>只复刻节奏、不照搬内容</b>。</p>
+      <div class="shot-chips">
+        <span class="chip">第 1 镜 · 3.8s</span><span class="chip">第 2 镜 · 6.2s</span><span class="chip">…按切点生成</span>
+      </div>
+      <p class="dep">→ 解锁：路线 A 的逐镜对齐 + 路线 B（若 ≤15s 且模型支持参考生视频）</p>
+    </div>
+    <div class="res-card generic">
+      <div class="head"><h3>爆款通用结构（参考）</h3><span class="badge amber">通用模板</span></div>
+      <p>固定 6 段高转化骨架，AI 据此 + 你的商品重新写脚本（不依赖参考片画面）。</p>
+      <div class="shot-chips">
+        <span class="chip">开场吸引 0-3s</span><span class="chip">痛点放大 3-8s</span><span class="chip">产品展示 8-15s</span>
+        <span class="chip">使用演示 15-25s</span><span class="chip">效果对比 25-35s</span><span class="chip">促销转化 35-40s</span>
+      </div>
+      <p class="dep">→ 只解锁：路线 A（不带真实节奏）；路线 B 不可用</p>
+    </div>
+  </div>
+
+  <!-- 3 商品 -->
+  <div class="zone-label"><div class="no">3</div><h2>上传你的商品</h2><span class="hint">第 2 步出结构前，本步置灰不可操作</span></div>
+  <div class="row c3">
+    <div class="card"><h3 style="font-size:14px;font-weight:700;margin-bottom:6px;">商品图片（1–5 张）</h3><p style="font-size:12.5px;color:#9a9ab5;line-height:1.6;">拖拽或点选上传，JPG / PNG。少图 → 画面可用素材少，保真重绘依赖它。</p></div>
+    <div class="card"><h3 style="font-size:14px;font-weight:700;margin-bottom:6px;">商品名称（必填）</h3><p style="font-size:12.5px;color:#9a9ab5;line-height:1.6;">两条路线都要求非空；也是项目命名来源（"{商品名} 复刻"）。</p></div>
+    <div class="card"><h3 style="font-size:14px;font-weight:700;margin-bottom:6px;">商品卖点</h3><p style="font-size:12.5px;color:#9a9ab5;line-height:1.6;">喂给脚本生成 / 模型级复刻提示词，决定"说什么"。</p></div>
+  </div>
+
+  <div class="arrow" style="margin-top:14px;">↓ &nbsp;&nbsp; 分岔：两条出口 &nbsp;&nbsp; ↓</div>
+
+  <!-- 4 两条路线 -->
+  <div class="branch-wrap">
+    <div class="branch a">
+      <span class="for">路线 A · 主路径</span>
+      <h3>开始复刻生成（按节奏出脚本）</h3>
+      <p style="font-size:12.5px;color:#9a9ab5;line-height:1.6;">点底部主按钮 <b>「开始复刻生成」</b> → 生成脚本后跳脚本页，继续走完整出片流程。</p>
+      <div class="chain">
+        <div class="step-line"><span class="dot"></span><span>创建项目 + 上传商品图到该项目</span></div>
+        <div class="step-line"><span class="dot"></span><span><span class="code">POST /api/llm/script</span> 生成脚本<br>targetDuration = 参考时长（夹在 15–40s）；真实解析时附 <span class="code">referenceStructure</span></span></div>
+        <div class="step-line"><span class="dot"></span><span>跳转 <span class="code">/project/&lt;id&gt;/script</span></span></div>
+      </div>
+      <div class="dest">后续（在项目里继续）：判官团改稿 → 画面生成 → 配音 → 字幕 → 合成 → 多平台导出</div>
+    </div>
+
+    <div class="branch b">
+      <span class="for">路线 B · 一键成片</span>
+      <h3>⚡ 一键成片复刻（模型级）</h3>
+      <p style="font-size:12.5px;color:#9a9ab5;line-height:1.6;">把参考视频 + 商品图直接交给 Seedance 参考生视频模型：保留运镜/节奏/景别，主体换成你的商品，一次调用出成片。</p>
+      <div class="chain">
+        <div class="step-line"><span class="dot"></span><span>同样先创建项目 + 上传商品图</span></div>
+        <div class="step-line"><span class="dot"></span><span><span class="code">POST /api/ai/video</span>（video-to-video）<br>参考视频 + 商品图；时长 = 参考时长夹在 4–15s；开音频</span></div>
+        <div class="step-line"><span class="dot"></span><span><span class="code">POST /replicate/save</span> 落盘成片（provider 链接会过期）</span></div>
+      </div>
+      <div class="dest">直接产出：成片预览 → 「查看导出」→ <span class="code">/project/&lt;id&gt;/export</span></div>
+    </div>
+  </div>
+
+  <!-- 拦阻条件 -->
+  <div class="zone-label"><div class="no">!</div><h2>前置条件与拦阻</h2><span class="hint">按钮置灰 / 报错都来自这几条</span></div>
+  <div class="guard">
+    <div class="item"><b>未配 LLM Key</b><span>路线 A 直接报错「尚未配置 LLM，请先到设置填写 API Key」</span></div>
+    <div class="item"><b>未配视频模型</b><span>路线 B 提示「需要配置视频模型（Max API + Seedance / Wan）」</span></div>
+    <div class="item"><b>模型不支持参考生视频</b><span>路线 B 提示换成 Seedance 系列；路线 A 不受影响</span></div>
+    <div class="item"><b>参考视频 &gt; 15 秒</b><span>路线 B 按钮禁用（徽标提示）；路线 A 的节奏复刻照常</span></div>
+  </div>
+
+  <div class="foot">
+    <div>一句话：想快 → 路线 B（一条素材直接出片）；想可控 → 路线 A（拿节奏骨架去写脚本，再逐镜调）</div>
+    <div>爆米AI · 爆款复刻（工作台）</div>
+  </div>
+</body>
+</html>
