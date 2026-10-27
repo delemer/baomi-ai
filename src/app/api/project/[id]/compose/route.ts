@@ -3,7 +3,7 @@ import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
 import { join, resolve, sep } from "path";
 import { existsSync } from "fs";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile, readFile } from "fs/promises";
 import { generateSpeech, estimateSpeechSeconds, type TTSConfig } from "@/lib/tts";
 import { stripPauseMarks } from "@/lib/voice-markup";
 import { shotEmotion, EMOTION_TTS } from "@/lib/emotion-acting";
@@ -79,12 +79,26 @@ export async function GET(
     // separator-agnostic: Windows rows store backslash absolute paths (issue #15)
     const fileName = fileNameOf(c.outputPath);
     const timelineUrl = fileName ? `/api/output/${id}/${encodeURIComponent(`${fileName}.timeline.json`)}` : null;
+    // 把降级信息（TTS 失败、缺素材被跳过的分镜）直接带给前端：以前只落在 timeline.json 里，
+    // 用户看到「成片怎么只有 4 秒」却得不到任何解释。
+    let warnings: { code: string; shotId: number }[] = [];
+    if (c.outputPath) {
+      try {
+        const parsed = JSON.parse(await readFile(`${c.outputPath}.timeline.json`, "utf8")) as {
+          warnings?: { code: string; shotId: number }[];
+        };
+        if (Array.isArray(parsed.warnings)) warnings = parsed.warnings;
+      } catch {
+        /* 老成片没有 sidecar，或仍在写入中 */
+      }
+    }
     return NextResponse.json({
       composition: {
         ...c,
         fileName,
         url: fileName ? `/api/output/${id}/${fileName}` : null,
         timelineUrl,
+        warnings,
       },
     });
   } catch (error) {
@@ -614,7 +628,16 @@ export async function POST(
         // BGM licensing (free CC attribution included) never reached the manifest.
         await db
           .update(compositions)
-          .set({ outputPath, status: "done", ...(thumbnailPath && { thumbnailPath }), ...(bgmLocal && { bgmPath: bgmLocal }) })
+          .set({
+            outputPath,
+            status: "done",
+            // duration / ttsEnabled 以前从没写过（恒为 null / false），下游统计与导出报告读到的
+            // 都是空值。合成完成时一定拿得到真实总时长与「是否真的生成了旁白」。
+            duration: timeline.total,
+            ttsEnabled: rendered.some((r) => Boolean(r.clip.audioPath)),
+            ...(thumbnailPath && { thumbnailPath }),
+            ...(bgmLocal && { bgmPath: bgmLocal }),
+          })
           .where(eq(compositions.id, comp.id));
         await db.update(projects).set({ status: "done", updatedAt: new Date() }).where(eq(projects.id, id));
       } catch (e) {

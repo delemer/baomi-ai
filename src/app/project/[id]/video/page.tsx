@@ -155,6 +155,10 @@ export default function VideoPage() {
   const [composeProgress, setComposeProgress] = useState(0);
   const [composeDone, setComposeDone] = useState(false);
   const [composeError, setComposeError] = useState<string | null>(null);
+  // 合成降级信息：缺素材被跳过的分镜 / 配音失败的分镜（来自 GET /compose 的 warnings）
+  const [composeWarnings, setComposeWarnings] = useState<{ code: string; shotId: number }[]>([]);
+  const missingMaterialShots = composeWarnings.filter((w) => w.code === "shot_skipped_missing_material").map((w) => w.shotId);
+  const ttsFailedShots = composeWarnings.filter((w) => w.code === "tts_failed" || w.code === "tts_fallback_free").map((w) => w.shotId);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   // 背景音乐
   const [bgm, setBgm] = useState<{ path: string; name: string } | null>(null);
@@ -470,7 +474,7 @@ export default function VideoPage() {
         const data = await res.json();
         if (!res.ok || !data.compositionId) throw new Error(data.error || "compose failed");
         // poll THIS composition by id (avoids the latest-row race across sequential renders)
-        const url: string = await new Promise((resolve, reject) => {
+        const result = await new Promise<{ url: string; warnings: { code: string; shotId: number }[] }>((resolve, reject) => {
           const poll = setInterval(async () => {
             try {
               const r = await fetch(`/api/project/${id}/compose?compositionId=${data.compositionId}`);
@@ -479,7 +483,7 @@ export default function VideoPage() {
               if (!c) return;
               if (c.status === "done" && c.url) {
                 clearInterval(poll);
-                resolve(c.url);
+                resolve({ url: c.url as string, warnings: (c.warnings ?? []) as { code: string; shotId: number }[] });
               } else if (c.status === "failed") {
                 clearInterval(poll);
                 reject(new Error("failed"));
@@ -493,7 +497,7 @@ export default function VideoPage() {
             reject(new Error("timeout"));
           }, 300000);
         });
-        setMatrixResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "done", url } : r)));
+        setMatrixResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "done", url: result.url } : r)));
       } catch {
         setMatrixResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, status: "failed" } : r)));
       }
@@ -508,6 +512,7 @@ export default function VideoPage() {
     setComposeDone(false);
     setOutputUrl(null);
     setComposeProgress(0);
+    setComposeWarnings([]);
 
     // 乐观进度：先爬到 90%，等真实结果回来再到 100%
     const timer = setInterval(() => {
@@ -546,7 +551,7 @@ export default function VideoPage() {
       if (!res.ok) throw new Error(data.error || t("errorComposeFailed"));
 
       // 轮询合成状态，直到 done / failed（后台任务，避免长视频请求超时）
-      const url: string = await new Promise((resolve, reject) => {
+      const result = await new Promise<{ url: string; warnings: { code: string; shotId: number }[] }>((resolve, reject) => {
         const poll = setInterval(async () => {
           try {
             const r = await fetch(`/api/project/${id}/compose`);
@@ -555,7 +560,7 @@ export default function VideoPage() {
             if (!c) return;
             if (c.status === "done" && c.url) {
               clearInterval(poll);
-              resolve(c.url);
+              resolve({ url: c.url as string, warnings: (c.warnings ?? []) as { code: string; shotId: number }[] });
             } else if (c.status === "failed") {
               clearInterval(poll);
               reject(new Error(t("errorComposeAssets")));
@@ -573,7 +578,8 @@ export default function VideoPage() {
 
       clearInterval(timer);
       setComposeProgress(100);
-      setOutputUrl(url);
+      setOutputUrl(result.url);
+      setComposeWarnings(result.warnings);
       setComposeDone(true);
     } catch (e) {
       clearInterval(timer);
@@ -1060,6 +1066,23 @@ export default function VideoPage() {
                 <div className="rounded-lg overflow-hidden border border-border/50 bg-black">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video src={outputUrl} controls className="w-full max-h-[360px]" />
+                </div>
+              )}
+
+              {/* 合成降级提示：成片出得来，但有的分镜被跳过 / 配音失败——不说明用户只会以为「片怎么这么短」 */}
+              {composeDone && composeWarnings.length > 0 && (
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/25 space-y-1">
+                  <p className="text-xs font-medium text-amber-600 dark:text-amber-400">⚠ {t("composeWarnTitle")}</p>
+                  {missingMaterialShots.length > 0 && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      {t("composeWarnMissing")} {missingMaterialShots.join("、")}
+                    </p>
+                  )}
+                  {ttsFailedShots.length > 0 && (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                      {t("composeWarnTts")} {ttsFailedShots.join("、")}
+                    </p>
+                  )}
                 </div>
               )}
 

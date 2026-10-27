@@ -17,6 +17,57 @@ env.allowRemoteModels = true;
 env.useBrowserCache = true;
 env.useWasmCache = true;
 
+/**
+ * 中国大陆网络适配（实测：huggingface.co 21s 超时不可达、cdn.jsdelivr.net 直接连不上；
+ * hf-mirror.com 与 registry.npmmirror.com 均 0.2–0.9s 可达）。
+ *
+ * 两处默认远端都要换掉，否则长素材转写永远卡在「下载模型 / wasm」：
+ *  1. 模型权重：transformers.js 的 env.remoteHost 默认 https://huggingface.co/
+ *     → 默认走 hf-mirror.com，可用 NEXT_PUBLIC_HF_ENDPOINT 覆盖（海外用户设回官方）；
+ *  2. onnxruntime 的 wasm：wasmPaths 未设置时会从 cdn.jsdelivr.net 拉
+ *     → 指到 npmmirror 的包文件目录，URL 里带运行时自报的 ORT 版本，
+ *       升级依赖后版本号自动跟随，不会对不上。
+ */
+const HF_ENDPOINT = (() => {
+  try {
+    const override = process.env.NEXT_PUBLIC_HF_ENDPOINT;
+    if (typeof override === "string" && override.trim()) return override.trim().replace(/\/+$/, "");
+  } catch {
+    /* worker 里 process 可能不存在 */
+  }
+  // 默认走本站代理：浏览器只需连本地，模型文件由服务端去镜像取（并落盘缓存）。
+  // 直接连 hf-mirror.com 在浏览器里会因 resolve 路径的 307 跳转/CORS 失败（实测）。
+  try {
+    return `${self.location.origin}/api/asr/model`;
+  } catch {
+    return "https://hf-mirror.com";
+  }
+})();
+env.remoteHost = HF_ENDPOINT;
+
+(() => {
+  try {
+    const onnxEnv = env.backends?.onnx;
+    if (!onnxEnv?.wasm) return;
+    const explicit = (() => {
+      try {
+        const v = process.env.NEXT_PUBLIC_ORT_WASM_BASE;
+        return typeof v === "string" && v.trim() ? `${v.trim().replace(/\/+$/, "")}/` : "";
+      } catch {
+        return "";
+      }
+    })();
+    const ortVersion = onnxEnv.versions?.web;
+    onnxEnv.wasm.wasmPaths =
+      explicit ||
+      (ortVersion
+        ? `https://registry.npmmirror.com/onnxruntime-web/${ortVersion}/files/dist/`
+        : "https://registry.npmmirror.com/onnxruntime-web/latest/files/dist/");
+  } catch {
+    /* 取不到版本就保持 transformers 默认（jsdelivr），至少不崩 */
+  }
+})();
+
 function post(message: AsrWorkerMessage): void {
   worker.postMessage(message);
 }
