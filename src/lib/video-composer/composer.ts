@@ -37,11 +37,14 @@ export function asciiSafePath(src: string): string {
     join(process.env.SystemDrive || "C:", "ProgramData", "BaoMiAI"),
   ].filter(Boolean);
   for (const root of roots) {
-    const dir = join(root, "ffmpeg-assets");
+    // Layout keeps the `fonts/subtitle.<ext>` shape on purpose: fontFamilyFromPath() keys off it
+    // to name the bundled Noto CJK face, and a renamed copy would silently fall back to a
+    // different family (breaking the drawn-text metrics the caption tests pin).
+    const dir = join(root, "ffmpeg-assets", key, "fonts");
     if (!ASCII_PATH_RE.test(dir)) continue; // user profile itself may be non-ASCII
     try {
       mkdirSync(dir, { recursive: true });
-      const target = join(dir, `subtitle-${key}${ext}`);
+      const target = join(dir, `subtitle${ext}`);
       if (!existsSync(target)) copyFileSync(abs, target);
       return target;
     } catch {
