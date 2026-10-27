@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDataDir, fileNameOf } from "@/lib/paths";
 import { ffprobeBin, ffmpegBin } from "@/lib/ffmpeg-path";
-import { join } from "path";
+import { join, resolve, sep } from "path";
 import { existsSync } from "fs";
 import { mkdir, writeFile } from "fs/promises";
 import { generateSpeech, estimateSpeechSeconds, type TTSConfig } from "@/lib/tts";
@@ -100,9 +100,22 @@ export async function GET(
 function toLocalPath(fileRef: string | undefined): string | undefined {
   if (!fileRef) return undefined;
   const m = fileRef.match(/\/api\/files\/(.+)/);
-  if (!m) return undefined;
-  const p = join(getDataDir(), "uploads", m[1]);
-  return existsSync(p) ? p : undefined;
+  if (m) {
+    const p = join(getDataDir(), "uploads", m[1]);
+    return existsSync(p) ? p : undefined;
+  }
+  // 演示模板（/examples/*.png）与其它站点静态图直接以绝对 URL 路径存在，不在 uploads 里。
+  // 旧实现只认 /api/files/*，导致 demo 项目的商品图全部解析失败 → 合成报「没有可用素材」，
+  // 连带批量出片也失败（批量跑的就是 demo 项目）。
+  if (fileRef.startsWith("/") && !fileRef.startsWith("//")) {
+    const publicRoot = join(process.cwd(), "public");
+    const p = resolve(publicRoot, fileRef.replace(/^\/+/, ""));
+    // 防目录穿越：解析后的路径必须仍在 public 目录内
+    if (p === publicRoot || p.startsWith(publicRoot + sep)) {
+      return existsSync(p) ? p : undefined;
+    }
+  }
+  return undefined;
 }
 
 /** 按镜头类型给商品原图分镜分配一个默认运镜 */
