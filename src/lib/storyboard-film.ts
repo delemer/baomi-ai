@@ -40,10 +40,16 @@ export function filmTotalSeconds(shots: Shot[]): number {
 export const FILM_FALLBACK_MODEL = "bytedance/seedance-2.5/reference-to-video";
 
 /**
- * Max API 中转站的参考生视频型号**就是 `seedance-2.5` 本身**，没有 `.../reference-to-video`
- * 这种变体 id。上游的 fallback 是按 Atlas 的命名写的，直接套到中转站会 404。
+ * Max API 中转站跑"整片"用的参考生视频型号。
+ *
+ * 换过两次：
+ *  1. `bytedance/seedance-2.5/reference-to-video` —— Atlas 的命名，中转站直接 503 model_not_found；
+ *  2. `seedance-2.5` —— 能跑，但中转站对它有参考素材时报价 ≈$0.91–2.04/秒，
+ *     30 秒整片要 $27–61（实测 /v1/video-estimates），贵且余额经常不够；
+ *  3. 现在用**多参生视频**：带参考视频时 ¥0.69–1.09/秒，30 秒约 ¥21–33（≈$3–5），
+ *     且它的参考图槽位就是 image_1..image_9、提示词用 @图片N，和整片 prompt 天然对齐。
  */
-export const MAX_RELAY_FILM_MODEL = "seedance-2.5";
+export const MAX_RELAY_FILM_MODEL = "supersolar-multi-reference-v2-app";
 
 export interface FilmModelChoice {
   /** The model that will actually be billed */
@@ -70,9 +76,16 @@ export function resolveFilmModel(configured?: string | null, provider?: string |
   const model = configured?.trim();
   if (model && model.includes("/reference-to-video")) return { model };
   const fallback = filmFallbackModel(provider);
-  // 中转站：用户配的就是 seedance-2.5 时不该报"被替换" —— 它本身就是参考生视频型号。
-  if (model && model === fallback) return { model };
+  // 中转站：用户配的就是多参/seedance-2.5 这类参考模型时不该报"被替换" —— 它们本身就能吃参考素材。
+  if (model && (model === fallback || (provider === "max-relay" && isMaxRelayReferenceModel(model)))) {
+    return { model };
+  }
   return { model: fallback, ...(model ? { swappedFrom: model } : {}) };
+}
+
+/** 中转站里"本身就是参考生视频"的型号（不换 id，也不报被替换）。 */
+function isMaxRelayReferenceModel(model: string): boolean {
+  return model === "supersolar-multi-reference-v2-app" || model === "seedance-2.5" || model === "supersolar-literary-drama-app";
 }
 
 /** The model's own longest single generation, when its schema declares a duration enum. */

@@ -257,7 +257,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Phase 2: wait; a lost poll marks the row "unknown" but never drops the paid task
     try {
-      const finalStatus = await provider.waitForTask(taskId, { interval: 5000 });
+      // 整片是一次性长任务，30 秒成片在慢模型上要 20–40 分钟。默认轮询上限（200×5s=16.7 分钟）
+      // 会让它在平台还在生成时就判定超时 → 用户看到"失败"但额度已被预扣。
+      // 给整片一个更宽的窗口：最多 60 分钟（整片本身就是"点了等结果"的交互）。
+      const waitAttempts = Math.min(720, Math.max(200, Math.ceil((duration * 90) / 5)));
+      const finalStatus = await provider.waitForTask(taskId, { interval: 5000, maxAttempts: waitAttempts });
       const result = finalStatus.result;
       const videoUrl = result && "videoUrls" in result ? result.videoUrls?.[0] : undefined;
       if (!videoUrl) {
