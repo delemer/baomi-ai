@@ -379,7 +379,11 @@ export class MaxRelayProvider extends BaseProvider {
       seconds: this.normalizeSeconds(options.duration),
       resolution: resolutionFor(family, resolutionTierOf(options.width, options.height)),
       ratio: ratioOf(options.width, options.height),
-      seed: typeof options.seed === 'number' && Number.isFinite(options.seed) ? options.seed : 0,
+    }
+    // seed 只发给声明支持它的族。seedance-2.5 的 /v1/models parameters 里没有 seed，
+    // 传了会直接 400「Seedance 2.5 不支持生成参数 seed」（整片流程会带 settings 里的 seed）。
+    if (family !== 'seedance25') {
+      parameters.seed = typeof options.seed === 'number' && Number.isFinite(options.seed) ? options.seed : 0
     }
 
     const assets: Array<Record<string, unknown>> = []
@@ -439,13 +443,29 @@ export class MaxRelayProvider extends BaseProvider {
       metadata: { parameters, ...(assets.length > 0 ? { assets } : {}) },
     }
 
-    const res = await this.request<MaxVideoObject>('/videos', {
-      method: 'POST',
-      body,
-      // 视频提交可能排队较久；同时这是计费 POST，绝不能自动重试。
-      timeout: 240000,
-      idempotent: false,
-    })
+    // 兼容自愈：中转站某些型号会对不支持的生成参数直接 400（如「不支持生成参数 seed」），
+    // 而这类 400 发生在计费之前。解析出参数名、删掉再试一次；只重试一次，避免无限循环。
+    let res: MaxVideoObject
+    try {
+      res = await this.request<MaxVideoObject>('/videos', {
+        method: 'POST',
+        body,
+        // 视频提交可能排队较久；同时这是计费 POST，绝不能自动重试。
+        timeout: 240000,
+        idempotent: false,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const rejected = msg.match(/不支持生成参数\s*([A-Za-z_][A-Za-z0-9_]*)/)?.[1]
+      if (!rejected || !(rejected in parameters)) throw err
+      delete parameters[rejected]
+      res = await this.request<MaxVideoObject>('/videos', {
+        method: 'POST',
+        body,
+        timeout: 240000,
+        idempotent: false,
+      })
+    }
     const taskId = res.id ?? res.task_id
     if (!taskId || typeof taskId !== 'string') {
       throw new ProviderError('视频接口未返回任务 ID，请到中转站后台核对，勿直接重复提交', 'NO_TASK_ID', this.name)
@@ -726,7 +746,13 @@ export class MaxRelayProvider extends BaseProvider {
    */
   private async ensurePublicUrl(ref: string): Promise<string> {
     if (!ref) throw new ProviderError('参考素材地址为空', 'BAD_REFERENCE', this.name)
-    if (ref.startsWith('data:')) return ref
+    if (ref.startsWith('data:')) {
+      // data URI 不是 URL：seedance-2.5 的素材只认 http(s)，直接塞 data: 会被
+      // 「asset 1 has an invalid URL」拒绝。先上传换一个签名 URL。
+      const asset = await this.uploadAsset(ref)
+      if (!asset.url) throw new ProviderError('素材上传未返回可访问地址', 'UPLOAD_FAILED', this.name)
+      return asset.url
+    }
     if (/^https?:\/\//i.test(ref)) {
       // 本站自己的文件地址（127.0.0.1 / localhost）中转站取不到，必须上传。
       if (!/^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/i.test(ref)) return ref
