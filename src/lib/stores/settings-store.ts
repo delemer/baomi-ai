@@ -48,6 +48,10 @@ export interface TTSSetting {
   speed?: number;
   /** MiniMax 国内端点的 GroupId（可选） */
   groupId?: string;
+  /** 本机音色样本路径（MiMo voiceclone），由 /api/tts/voice-sample 上传后写入 */
+  voiceSamplePath?: string;
+  /** 样本文件名，仅用于界面展示 */
+  voiceSampleName?: string;
 }
 
 export interface SettingsState {

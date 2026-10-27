@@ -296,6 +296,29 @@ export default function SettingsPage() {
     setRelayApplied(true);
   };
 
+  // 声音克隆样本上传（MiMo voiceclone）：样本存盘，设置里只记路径
+  const [voiceSampleStatus, setVoiceSampleStatus] = useState<"idle" | "uploading" | "error">("idle");
+  const [voiceSampleError, setVoiceSampleError] = useState("");
+  const uploadVoiceSample = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 允许再次选择同一个文件
+    if (!file) return;
+    setVoiceSampleStatus("uploading");
+    setVoiceSampleError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/tts/voice-sample", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || t("ttsCloneFailed"));
+      // 上传成功后自动切到克隆模型，省掉用户手动改下拉
+      setTTS({ ...tts, voiceSamplePath: data.path, voiceSampleName: data.name, model: "mimo-v2.5-tts-voiceclone" });
+      setVoiceSampleStatus("idle");
+    } catch (err) {
+      setVoiceSampleStatus("error");
+      setVoiceSampleError(err instanceof Error ? err.message : String(err));
+    }
+  };
   // TTS preview playback state
   const [ttsTestStatus, setTtsTestStatus] = useState<"idle" | "testing" | "error">("idle");
   const testTTS = async () => {
@@ -922,6 +945,45 @@ export default function SettingsPage() {
                                 </SelectContent>
                               </Select>
                             </div>
+
+                            {/* 声音克隆：仅 MiMo 支持。样本走上传接口存盘，设置里只存路径，
+                                避免几百 KB 的 base64 塞进 localStorage 并随每次请求重复传输。 */}
+                            {ttsMeta.value === "mimo" && (
+                              <div className="space-y-1.5 pt-1">
+                                <Label className="text-xs text-muted-foreground">{t("ttsCloneLabel")}</Label>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <input
+                                    type="file"
+                                    accept=".mp3,.wav,.m4a,.aac,.ogg"
+                                    className="block max-w-full text-[11px] file:mr-2 file:rounded file:border file:border-border/60 file:bg-background file:px-2 file:py-1 file:text-[11px]"
+                                    onChange={uploadVoiceSample}
+                                  />
+                                  {tts.voiceSamplePath && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="text-xs"
+                                      onClick={() => setTTS({ ...tts, voiceSamplePath: undefined, voiceSampleName: undefined })}
+                                    >
+                                      {t("ttsCloneClear")}
+                                    </Button>
+                                  )}
+                                </div>
+                                {voiceSampleStatus === "uploading" && (
+                                  <p className="text-[11px] text-muted-foreground">{t("ttsCloneUploading")}</p>
+                                )}
+                                {voiceSampleStatus === "error" && (
+                                  <p role="alert" className="text-[11px] text-destructive break-all">{voiceSampleError}</p>
+                                )}
+                                {tts.voiceSamplePath && voiceSampleStatus !== "error" && (
+                                  <p className="text-[11px] text-emerald-500">
+                                    {t("ttsCloneUploaded")} {tts.voiceSampleName || "sample"}
+                                    {tts.model === "mimo-v2.5-tts-voiceclone" ? t("ttsCloneActive") : t("ttsClonePickModel")}
+                                  </p>
+                                )}
+                                <p className="text-[11px] text-muted-foreground/80">{t("ttsCloneHint")}</p>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}

@@ -176,6 +176,8 @@ interface TTSSettingLike {
   voice?: string;
   speed?: number;
   groupId?: string;
+  /** 本机音色样本的绝对路径（MiMo voiceclone 用），由 /api/tts/voice-sample 上传后写入 */
+  voiceSamplePath?: string;
 }
 type ProvidersLike = Record<string, { apiKey?: string; baseUrl?: string } | undefined>;
 
@@ -209,6 +211,7 @@ export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: Pro
     voice: tts?.voice || meta.defaultVoice,
     ...(tts?.speed != null && { speed: tts.speed }),
     ...(meta.value === "minimax" && tts?.groupId ? { groupId: tts.groupId } : {}),
+    ...(tts?.voiceSamplePath ? { voiceSamplePath: tts.voiceSamplePath } : {}),
   };
 }
 
@@ -216,5 +219,7 @@ export function resolveTTSConfig(tts: TTSSettingLike | undefined, providers: Pro
 export function isPaidTTSReady(tts: TTSSettingLike | undefined, providers: ProvidersLike): boolean {
   if (!tts?.enabled) return false;
   const c = resolveTTSConfig(tts, providers);
-  return Boolean(c.apiKey && c.baseUrl && c.model && c.voice);
+  // 声音克隆模型不用 voice（拿上传的样本代替），所以有样本也算就绪
+  const voiceOk = Boolean(c.voice) || Boolean(tts?.voiceSamplePath);
+  return Boolean(c.apiKey && c.baseUrl && c.model && voiceOk);
 }

@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
     if (!text) {
       return apiError(req, "缺少配音文本", "Missing voiceover text");
     }
-    if (!ttsConfig?.baseUrl || !ttsConfig?.apiKey || !ttsConfig?.model || !ttsConfig?.voice) {
+    if (!ttsConfig?.baseUrl || !ttsConfig?.apiKey || !ttsConfig?.model || (!ttsConfig?.voice && !ttsConfig?.voiceSamplePath)) {
       return apiError(
         req,
         "请先在设置中配置 TTS（baseUrl、apiKey、model、voice）",

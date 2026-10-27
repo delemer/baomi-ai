@@ -26,6 +26,8 @@ export interface TTSConfig {
   model: string;
   /** Voice / voice_id */
   voice: string;
+  /** 本机音色样本路径（MiMo voiceclone 用）：服务端读文件后 base64 塞进 audio.voice */
+  voiceSamplePath?: string;
   /** Playback speed multiplier, 0.5–2 (each platform clamps to its own valid range); defaults to 1 */
   speed?: number;
   /** GroupId for MiniMax domestic endpoint (optional) */
@@ -243,8 +245,36 @@ async function generateSpeechOpenAI(text: string, config: TTSConfig): Promise<Bu
  * `https://token-plan-cn.xiaomimimo.com/v1` 也能出音频，但官方条款限定只能用于编程工具，
  * 用在应用后端属于违规，所以这里不把它设为默认值。
  */
+/**
+ * 解析 MiMo 的 `audio.voice`：预置音色直接用 id；克隆模型必须给样本。
+ *
+ * 克隆样本要求 `data:<mime>;base64,...`，所以服务端把上传的文件读出来编码。
+ * 安全：只允许读 uploads/tts-voices 目录下的文件（路径由上传接口写入，防止被拼成任意路径读取）。
+ */
+async function resolveMiMoVoice(config: TTSConfig): Promise<string | undefined> {
+  const isClone = /voiceclone/i.test(config.model || "");
+  if (!isClone) return config.voice || undefined;
+  if (config.voice?.startsWith("data:")) return config.voice; // 调用方已自行编码
+  if (!config.voiceSamplePath) {
+    throw new Error("MiMo 声音克隆需要音色样本：请先在设置里上传一段 3–60 秒的清晰人声（mp3/wav）");
+  }
+  const { resolve, extname, sep } = await import("node:path");
+  const { readFile } = await import("node:fs/promises");
+  const { getDataDir } = await import("@/lib/paths");
+  const root = resolve(getDataDir(), "uploads", "tts-voices");
+  const file = resolve(config.voiceSamplePath);
+  if (file !== root && !file.startsWith(root + sep)) {
+    throw new Error("音色样本路径非法（只允许读取本应用上传的样本）");
+  }
+  const ext = extname(file).toLowerCase();
+  const mime = ext === ".wav" ? "audio/wav" : "audio/mpeg";
+  const buf = await readFile(file);
+  return `data:${mime};base64,${buf.toString("base64")}`;
+}
+
 async function generateSpeechMiMo(text: string, config: TTSConfig): Promise<Buffer> {
   const base = (config.baseUrl || "https://api.xiaomimimo.com/v1").replace(/\/$/, "");
+  const voice = await resolveMiMoVoice(config);
   const resp = await fetch(`${base}/chat/completions`, {
     method: "POST",
     headers: {
@@ -262,7 +292,7 @@ async function generateSpeechMiMo(text: string, config: TTSConfig): Promise<Buff
       audio: {
         // compose 管线按 mp3 处理（配音文件后缀写死 .mp3），所以这里固定要 mp3
         format: "mp3",
-        ...(config.voice && { voice: config.voice }),
+        ...(voice && { voice }),
       },
     }),
     // 长文案合成可能十几秒，给足余量并按需超时
