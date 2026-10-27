@@ -365,8 +365,13 @@ export async function POST(
         }
       }
       const nativeAudio = isVideo ? await videoHasAudio(local) : false;
+      // 用户显式配置了**付费 TTS** 时，旁白优先于视频自带音轨：不少视频模型会附带环境音
+      // （而 prompt 里常写"无人声"），旧逻辑只要探测到任何可听音轨就跳过配音，用户看到的
+      // 结果就是"配了 TTS 却没声音"。两条音轨会一起混进成片（旁白 + 低音量的原生环境音）。
+      // 免费兜底 TTS 仍保持保守策略（视频已有人声就不叠），避免双语重叠。
+      const preferTtsOverNative = Boolean(ttsConfig);
       const vo =
-        shot.voiceover && !nativeAudio
+        shot.voiceover && (preferTtsOverNative || !nativeAudio)
           ? await buildVoiceover(shot.shotId, shot.voiceover, shot.characterId ? characterVoices.get(shot.characterId) : undefined, shot.type)
           : undefined;
       const audioPath = vo?.file;

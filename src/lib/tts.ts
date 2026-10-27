@@ -169,6 +169,8 @@ function dispatchTTS(clean: string, config: TTSConfig): Promise<Buffer> {
       return generateSpeechMiniMax(clean, config);
     case "falai":
       return generateSpeechFal(clean, config);
+    case "mimo":
+      return generateSpeechMiMo(clean, config);
     default:
       return generateSpeechOpenAI(clean, config);
   }
@@ -226,6 +228,58 @@ async function generateSpeechOpenAI(text: string, config: TTSConfig): Promise<Bu
     throw new Error(`TTS 请求失败: ${resp.status} ${resp.statusText} - ${clipErr(errText)}`);
   }
   return Buffer.from(await resp.arrayBuffer());
+}
+
+// ==================== 小米 MiMo TTS（chat/completions + audio 参数） ====================
+
+/**
+ * MiMo 的 TTS **不是** OpenAI 的 `/audio/speech`，而是复用 chat/completions：
+ *   - 要朗读的文本必须放在 `role: "assistant"` 的 content 里（放 user 里不会念）；
+ *   - `role: "user"` 是"导演指令"（语气/情绪/方言），可以留空；
+ *   - 音频参数在顶层 `audio`：`{ format, voice }`，返回 `choices[0].message.audio.data`（base64）；
+ *   - 鉴权用 `api-key` 头（也接受 Bearer）。
+ *
+ * 默认走按量付费网关 `https://api.xiaomimimo.com/v1`；Token Plan 订阅网关
+ * `https://token-plan-cn.xiaomimimo.com/v1` 也能出音频，但官方条款限定只能用于编程工具，
+ * 用在应用后端属于违规，所以这里不把它设为默认值。
+ */
+async function generateSpeechMiMo(text: string, config: TTSConfig): Promise<Buffer> {
+  const base = (config.baseUrl || "https://api.xiaomimimo.com/v1").replace(/\/$/, "");
+  const resp = await fetch(`${base}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "api-key": config.apiKey,
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.model || "mimo-v2.5-tts",
+      messages: [
+        // 空的 user 指令是合法的；有 instruction 时它就是"导演模式"的自然语言控制
+        { role: "user", content: config.instruction || "" },
+        { role: "assistant", content: text },
+      ],
+      audio: {
+        // compose 管线按 mp3 处理（配音文件后缀写死 .mp3），所以这里固定要 mp3
+        format: "mp3",
+        ...(config.voice && { voice: config.voice }),
+      },
+    }),
+    // 长文案合成可能十几秒，给足余量并按需超时
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => "");
+    throw new Error(`MiMo TTS 请求失败: ${resp.status} ${resp.statusText} - ${clipErr(errText)}`);
+  }
+  const body = (await resp.json()) as {
+    choices?: Array<{ message?: { audio?: { data?: string } | null } }>;
+  };
+  const b64 = body.choices?.[0]?.message?.audio?.data;
+  if (!b64) {
+    throw new Error("MiMo TTS 未返回音频数据（检查模型名是否为 mimo-v2.5-tts 系列，以及 voice 是否合法）");
+  }
+  return Buffer.from(b64, "base64");
 }
 
 // ==================== Atlas Cloud generateAudio（异步轮询） ====================

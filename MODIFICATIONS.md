@@ -92,6 +92,16 @@ Max API 的 `supersolar-*-app` 系列走**另一个端点** `POST /v1/video-gene
   中转站没有这个 id（参考生视频就是 `seedance-2.5` 本身）。改为按 provider 取兜底型号，
   并在适配器里为 `seedance-2.5` 补 `omni_reference_task_type: "reference"` 与音频开关。
 
+### 5.3 新增 TTS：小米 MiMo（替代已失效的免费 Edge TTS）
+
+- MIcrosoft Edge 免费 TTS 的非公开接口已对所有版本号返回 403，免费配音链路不可用。
+- 新增 `mimo` TTS provider（`src/lib/tts.ts` / `src/lib/tts-presets.ts`）：
+  走 `POST /v1/chat/completions` + 顶层 `audio` 参数（**不是** OpenAI 的 `/audio/speech`），
+  待朗读文本必须放在 `assistant` 消息里，返回 `choices[0].message.audio.data` 的 base64 音频。
+- 修复：**用户显式配置付费 TTS 时，旁白优先于视频自带音轨**。旧逻辑只要探测到视频有任何可听
+  音轨就跳过配音，导致"配了 TTS 却没声音"（本项目的视频模型自带环境音）。现在付费 TTS 与
+  原生音轨混音输出；免费兜底 TTS 仍保持保守策略。
+
 ### 6. 补齐分发合规材料
 
 - `package.json` 的 `build.extraResources` 现在会把 `LICENSE`、`NOTICE`、`THIRD-PARTY-NOTICES.md` 打进安装包（上游的 `build.files` 未包含，属分发缺口）

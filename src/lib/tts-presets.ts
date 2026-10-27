@@ -8,7 +8,7 @@
  * and offer voice suggestions accordingly.
  */
 
-export type TTSProvider = "openai" | "atlas" | "minimax" | "falai";
+export type TTSProvider = "openai" | "atlas" | "minimax" | "falai" | "mimo";
 
 export interface TTSVoiceOption {
   value: string;
@@ -61,6 +61,34 @@ export const TTS_PROVIDERS: TTSProviderMeta[] = [
     keySource: "tts",
     editableBaseUrl: true,
     hint: "兼容 OpenAI tts-1、硅基流动 CosyVoice、火山方舟等所有 /audio/speech 端点。",
+  },
+  {
+    value: "mimo",
+    label: "小米 MiMo TTS",
+    // 按量付费网关（应用可用）。Token Plan 订阅网关 token-plan-cn.xiaomimimo.com 也能出音频，
+    // 但官方条款限定只能用于编程工具，用在应用后端属违规 —— 所以不设为默认。
+    baseUrl: "https://api.xiaomimimo.com/v1",
+    defaultModel: "mimo-v2.5-tts",
+    models: [
+      { value: "mimo-v2.5-tts", label: "mimo-v2.5-tts（预置音色）" },
+      { value: "mimo-v2.5-tts-voicedesign", label: "voicedesign（文字描述生成音色）" },
+      { value: "mimo-v2.5-tts-voiceclone", label: "voiceclone（音频样本克隆音色）" },
+    ],
+    defaultVoice: "冰糖",
+    voices: [
+      { value: "mimo_default", label: "默认音色" },
+      { value: "冰糖", label: "冰糖 · 女声" },
+      { value: "茉莉", label: "茉莉 · 女声" },
+      { value: "苏打", label: "苏打 · 男声" },
+      { value: "白桦", label: "白桦 · 男声" },
+      { value: "Mia", label: "Mia · 英文女声" },
+      { value: "Chloe", label: "Chloe · 英文女声" },
+      { value: "Milo", label: "Milo · 英文男声" },
+      { value: "Dean", label: "Dean · 英文男声" },
+    ],
+    keySource: "tts",
+    editableBaseUrl: true,
+    hint: "走 chat/completions + audio 参数（不是 /audio/speech）；key 填 platform.xiaomimimo.com 的按量付费 Key。voicedesign/voiceclone 需要在请求里换 model 并提供描述或样本。",
   },
   {
     value: "atlas",
