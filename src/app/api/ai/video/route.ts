@@ -136,8 +136,12 @@ export async function POST(req: NextRequest) {
       });
     } catch (error) {
       // definitive provider-side failure vs. lost contact (task may still be running & billed)
-      const failed = error instanceof ProviderError && error.code === "TASK_FAILED";
       const message = error instanceof Error ? error.message : String(error);
+      // 中转站/平台的"额度不足、Key 无效"是**确定性失败**：任务不会自己恢复，也不该提示
+      // 用户"去素材页恢复查询、请勿重复提交"（旧逻辑把它归为可恢复的 504，误导性极强）。
+      const terminal =
+        /额度不足|余额不足|quota|insufficient|invalid api key|无可用渠道|未授权|unauthorized/i.test(message);
+      const failed = (error instanceof ProviderError && error.code === "TASK_FAILED") || terminal;
       await updateAiTask(rowId, { status: failed ? "failed" : "unknown", error: message });
       return NextResponse.json(
         {

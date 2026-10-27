@@ -307,8 +307,31 @@ export async function completeWithJsonRetry<T>(
       () => client.chat.completions.create({ ...params, messages }),
       cfg,
     );
-    const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error("LLM 未返回有效内容");
+    const choice = response.choices[0];
+    const content = choice?.message?.content;
+    // 推理模型（deepseek-v4.1-flash / o 系列）先输出 reasoning，正文吃同一份 token 预算：
+    // 预算打满时 finish_reason=length，表现为 content 被截断（半截 JSON）或直接为空，
+    // 而 reasoning_content 不为空。这不是"模型不支持"，只是预算没给够 —— 抬高预算重试一次。
+    const rawMessage = choice?.message as { reasoning?: unknown; reasoning_content?: unknown } | undefined;
+    const reasoning =
+      typeof rawMessage?.reasoning_content === "string"
+        ? rawMessage.reasoning_content
+        : typeof rawMessage?.reasoning === "string"
+          ? rawMessage.reasoning
+          : "";
+    if (attempt === 0 && choice?.finish_reason === "length" && reasoning.length > 0) {
+      const current = params.max_tokens ?? 4096;
+      params = { ...params, max_tokens: Math.min(32000, Math.max(8192, current * 2)) };
+      lastErr = new Error("推理模型的思维链占用了输出预算（finish_reason=length）");
+      continue;
+    }
+    if (!content) {
+      throw new Error(
+        reasoning.length > 0
+          ? "LLM 未返回有效内容：模型把输出预算全部用在了推理过程上（reasoning 非空、content 为空）。请换用非推理模型，或提高 max_tokens 后重试。"
+          : "LLM 未返回有效内容（content 为空，且没有 reasoning）。请检查模型是否可用、是否被内容策略拦截。",
+      );
+    }
     try {
       return parse(content);
     } catch (err) {
