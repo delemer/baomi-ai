@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join, extname, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -54,7 +54,9 @@ export async function POST(req: NextRequest) {
     }
     await writeFile(target, buf);
 
-    // 用 ffprobe 读时长：克隆样本太短效果差，太长又浪费上传与推理时间
+    // 用 ffprobe 读时长：克隆样本太短效果差，太长又浪费上传与推理时间。
+    // 校验失败必须把已落盘的文件删掉——否则每次被拒的上传都会在 tts-voices 目录里留一个
+    // 孤儿文件（文件名是内容哈希，内容不同就一直累积）。
     let seconds = 0;
     try {
       const { stdout } = await execFileAsync(ffprobeBin(), [
@@ -62,9 +64,11 @@ export async function POST(req: NextRequest) {
       ]);
       seconds = Number(String(stdout).trim()) || 0;
     } catch {
+      await rm(target, { force: true }).catch(() => {});
       return apiError(req, "音频无法解析，请确认是有效的 mp3/wav 文件", "Cannot parse the audio file", 400);
     }
     if (seconds < MIN_SECONDS || seconds > MAX_SECONDS) {
+      await rm(target, { force: true }).catch(() => {});
       return apiError(
         req,
         `样本时长 ${seconds.toFixed(1)} 秒，请提供 ${MIN_SECONDS}–${MAX_SECONDS} 秒的清晰人声（无背景音乐、无人声重叠）`,

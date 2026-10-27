@@ -262,6 +262,15 @@ export function explainLLMStatus(status: number | undefined, target: LLMTarget =
   const baseUrl = target.baseUrl || "?";
 
   if (status === 401 || status === 403) {
+    // 许多网关（new-api / supersolar 等）用 **403** 表示"令牌额度耗尽"（body 里是
+    // pre_consume_token_quota_failed / token quota is not enough），和"Key 无效"同码。
+    // 一律当成鉴权失败会让用户去换 Key、白折腾一圈 —— 先按报错正文区分。
+    if (/quota|insufficient|balance|credit|额度|余额|配额/i.test(target.detail ?? "")) {
+      return {
+        zh: "额度已用尽（不是 Key 失效）：请到中转站/平台后台把这个令牌的额度上限调大或充值后重试",
+        en: "Quota exhausted (not a bad key): raise this token's quota limit or top up the account, then retry",
+      };
+    }
     return {
       zh: "API Key 无效或无权限：请到对应平台重新复制 Key，并确认该 Key 已开通这个模型",
       en: "Invalid or unauthorized API key: copy a fresh key from the provider and make sure it can access this model",

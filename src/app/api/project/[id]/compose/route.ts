@@ -247,7 +247,7 @@ export async function POST(
 
     // Structured degradation log for this render (in-memory for now; persisted into the
     // .timeline.json sidecar so tooling can surface which shots degraded and why)
-    const composeWarnings: { code: "tts_fallback_free" | "tts_failed"; shotId: number }[] = [];
+    const composeWarnings: { code: "tts_fallback_free" | "tts_failed" | "shot_skipped_missing_material"; shotId: number }[] = [];
 
     /**
      * 为某分镜生成配音并落地为本地 mp3；失败返回 undefined（不阻断合成）。
@@ -596,8 +596,13 @@ export async function POST(
                 bgmUrl: renderedStems.bgmPath ? `/api/output/${id}/${stemDirName}/bgm.wav` : null,
               },
             } : {}),
-            // structured degradation log (TTS fallbacks / failed shots) — surfaced by tooling later
-            ...(composeWarnings.length > 0 ? { warnings: composeWarnings } : {}),
+            // 缺素材被跳过的分镜：旧实现只把 shotId 收进 missing 数组就丢掉，用户只会看到
+            // 「成片怎么只有 4 秒」而无任何解释。这里落进 timeline 的 warnings 供界面/工具展示。
+            ...(missing.length > 0
+              ? { warnings: [...composeWarnings, ...missing.map((shotId) => ({ code: "shot_skipped_missing_material" as const, shotId }))] }
+              : composeWarnings.length > 0
+                ? { warnings: composeWarnings }
+                : {}),
           }),
           "utf8"
         ).catch(() => {});

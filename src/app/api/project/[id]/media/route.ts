@@ -89,7 +89,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!SAFE_ID.test(id)) return apiError(req, "无效的项目ID", "Invalid project ID", 400);
-  if (!req.body) return apiError(req, "没有收到视频文件", "No video file received", 400);
+  // Next 里 req.body 恒不为 null（空请求体也是一个空 ReadableStream），旧写法 `if (!req.body)`
+  // 永远不会命中：空上传会先落一个 0 字节文件、再被 ffprobe 判成「视频无法解码」（422），
+  // 文案把"你没发文件"说成了"文件损坏"。改为按真实声明长度判断 + 落盘后再兜一层。
+  const declaredLength = req.headers.get("content-length");
+  if (declaredLength !== null && Number(declaredLength) === 0) {
+    return apiError(req, "没有收到视频文件", "No video file received", 400);
+  }
 
   const originalName = decodedOriginalName(req.headers.get("x-file-name"));
   const extension = extname(originalName).toLowerCase();
@@ -123,6 +129,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       guard,
       createWriteStream(filePath, { flags: "wx" }),
     );
+    if (receivedBytes === 0) {
+      // chunked 上传（无 content-length）时上面那层挡不住，这里兜底
+      await rm(filePath, { force: true });
+      return apiError(req, "没有收到视频文件", "No video file received", 400);
+    }
     if (!(await validateOrDelete(filePath, "video"))) {
       return apiError(req, "视频无法解码或文件已损坏", "The video cannot be decoded or is damaged", 422);
     }

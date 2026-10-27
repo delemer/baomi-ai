@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { extractJSON } from "@/lib/script-engine/generator";
+import { completeWithJsonRetry, extractJSON } from "@/lib/script-engine/generator";
 import { buildPublishPrompt, buildCommentKit, type CommentKit } from "@/lib/publish-pack";
 import { apiError, errText } from "@/lib/api-error";
-import { createLLMClient, llmErrorPair, withLLMErrors } from "@/lib/llm-error";
+import { createLLMClient, llmErrorPair } from "@/lib/llm-error";
 
 /**
  * Generate publish copy: 3 titles, #hashtags, a one-line promotional caption, plus the
@@ -25,29 +25,29 @@ export async function POST(req: NextRequest) {
     const en = locale === "en";
     const prompt = buildPublishPrompt({ productName, category, productDescription, platform }, en ? "en" : "zh");
 
-    const resp = await withLLMErrors(
-      () =>
-        client.chat.completions.create({
-          model: llmConfig.model,
-          messages: [
-            { role: "system", content: en ? "You only output JSON, no explanation." : "你只输出 JSON，不输出任何解释。" },
-            { role: "user", content: prompt },
-          ],
-          temperature: 0.9,
-          max_tokens: 1200,
-        }),
-      llmConfig,
-    );
-
-    const content = resp.choices[0]?.message?.content;
-    if (!content) throw new Error("LLM 未返回内容");
-
-    const parsed = JSON.parse(extractJSON(content)) as {
+    // 走 completeWithJsonRetry（与脚本生成同一个 JSON 稳健性阶梯）：
+    // 推理模型（deepseek-v4.1-flash 等）会把 reasoning 与正文吃同一份 max_tokens 预算，
+    // 旧实现硬编码 1200 且无重试 → 约 1/3 概率 finish_reason=length 被截断或 content 为空，
+    // 表现为发布文案随机 500。这里起步就给 4000，并在 length+reasoning 时自动再抬到 ≥8192。
+    const parsed = await completeWithJsonRetry<{
       titles?: string[];
       hashtags?: string[];
       caption?: string;
       commentKit?: { pinned?: string; objections?: { q?: string; a?: string }[] };
-    };
+    }>(
+      client,
+      {
+        model: llmConfig.model,
+        messages: [
+          { role: "system", content: en ? "You only output JSON, no explanation." : "你只输出 JSON，不输出任何解释。" },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.9,
+        max_tokens: 4000,
+      },
+      llmConfig,
+      (content) => JSON.parse(extractJSON(content)),
+    );
 
     // comment kit: keep only well-formed LLM entries; fall back to the deterministic
     // template kit so the field is never missing (the notice always comes from our side —
