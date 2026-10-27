@@ -21,6 +21,9 @@ const nextConfig: NextConfig = {
     // large. Raise the cap above the app's own 80MB upload limit (plus multipart overhead).
     proxyClientMaxBodySize: "256mb",
   },
+  // 从 127.0.0.1 打开时（而不是 localhost），Next 16 会拦截 /_next/* 开发资源并报
+  // "Blocked cross-origin request ... /_next/webpack-hmr"，HMR 与控制台都跟着坏。
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
 };
 
 export default nextConfig;
