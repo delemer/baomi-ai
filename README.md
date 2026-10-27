@@ -4,6 +4,7 @@
 > - 本版本由 **爆米AI 团队** 于 **2026-10-26** 修改，主要改动：接入 Max API 中转站（自有 Provider / 一键接入 / 默认模型）、品牌更名与换 Logo、补齐分发合规材料、移除上游返利链接。
 > - 详细改动清单见 **[MODIFICATIONS.md](MODIFICATIONS.md)**；本版本同样以 **AGPL-3.0-only** 发布，完整对应源码：<https://github.com/delemer/baomi-ai>
 > - **第一次用？先看 [用户接入说明（GUIDE.md）](GUIDE.md)** —— 注册中转站 → 粘贴 Key → 出片，五分钟搞定。
+> - **功能全景：[功能框架图](docs/baomi-framework.png)**
 > - 上游的 `LICENSE` / `NOTICE` 已原样保留，原作者的版权与署名不受影响。
 
 <p align="center"><img src="docs/banner.png" alt="ClipForge — 开源 AI 带货短视频神器，一张商品图自动产出抖音小店/快手/小红书/TikTok Shop 卖货短视频" width="820"/></p>
