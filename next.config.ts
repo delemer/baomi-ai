@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "/**": ["./.git/**", "./.github/**", "./data/**", "./docs/**", "./tasks/**", "./release/**", "./integrations/**", "./e2e/**", "./remotion/**"],
   },
+  experimental: {
+    // Next 16 buffers the request body in memory whenever `proxy` (middleware) matches the route,
+    // capped at 10MB by default. Our proxy matches "/api/:path*" for CORS, so EVERY upload over
+    // 10MB had its body silently truncated and `req.formData()` threw — surfacing as the useless
+    // "无效的上传数据" on the media-lab analyzer, local-material uploads (80MB cap) and anything else
+    // large. Raise the cap above the app's own 80MB upload limit (plus multipart overhead).
+    proxyClientMaxBodySize: "256mb",
+  },
 };
 
 export default nextConfig;

@@ -102,6 +102,16 @@ Max API 的 `supersolar-*-app` 系列走**另一个端点** `POST /v1/video-gene
   音轨就跳过配音，导致"配了 TTS 却没声音"（本项目的视频模型自带环境音）。现在付费 TTS 与
   原生音轨混音输出；免费兜底 TTS 仍保持保守策略。
 
+### 5.4 修复：>10MB 上传全部失败（"无效的上传数据"）
+
+- 根因：Next 16 在 `proxy`（中间件）匹配到路由时会**把请求体克隆并缓冲在内存**，默认上限 **10MB**；
+  超出后只缓冲到上限，`req.formData()` 直接抛错。本项目的 `src/proxy.ts` 匹配 `/api/:path*`
+  （为了本地跨端口 CORS），于是**所有超过 10MB 的上传都会被静默截断**：
+  媒体解构（视频上限 80MB）、本地素材（80MB）、模板导入（20MB）等。
+- 修法：`next.config.ts` 增加 `experimental.proxyClientMaxBodySize: "256mb"`，
+  覆盖应用自身的 80MB 上限并留出 multipart 开销。
+- 实测：14.3MB 视频从 `400 无效的上传数据` → `200` 正常返回解构结果。
+
 ### 6. 补齐分发合规材料
 
 - `package.json` 的 `build.extraResources` 现在会把 `LICENSE`、`NOTICE`、`THIRD-PARTY-NOTICES.md` 打进安装包（上游的 `build.files` 未包含，属分发缺口）
